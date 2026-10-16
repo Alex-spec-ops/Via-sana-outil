@@ -76,6 +76,7 @@ async function openSupabase(url: string): Promise<Engine> {
     prepare: false, // compatible with Supabase's transaction pooler (port 6543)
     max: 3,
     idle_timeout: 20,
+    onnotice: () => {}, // e.g. "table does not exist, skipping" while (re)building the demo schema
     types: { bigint: { to: 20, from: [20], parse: (v: string) => Number(v), serialize: (v: number) => String(v) } },
   });
   const unsafe = (s: typeof sql) => async (text: string, values: Value[]) =>
