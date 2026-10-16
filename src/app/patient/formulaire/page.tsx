@@ -1,48 +1,11 @@
 import Link from "next/link";
-import { saveIntake } from "@/app/actions";
 import { requirePatient } from "@/lib/auth";
-import { INTAKE_SECTIONS, PROFESSION_LABEL, type IntakeAnswers, type IntakeField } from "@/lib/domain";
+import { INTAKE_SECTIONS } from "@/lib/domain";
 import { formatDate } from "@/lib/format";
 import { getPatientSpace } from "@/lib/queries";
-import { Card, EmptyState } from "@/components/ui";
+import { Card, EmptyState, Notice } from "@/components/ui";
 import { IntakeView } from "@/components/intake-view";
-import { SubmitButton } from "@/components/submit-button";
-
-function Field({ field, value }: { field: IntakeField; value: IntakeAnswers[string] | undefined }) {
-  const id = `f-${field.id}`;
-  const str = value === null || value === undefined ? "" : String(value);
-  if (field.type === "boolean") {
-    return (
-      <fieldset>
-        <legend className="label">{field.label}</legend>
-        <div className="flex gap-4 text-sm">
-          <label className="flex items-center gap-1.5"><input type="radio" name={field.id} value="oui" defaultChecked={value === true} /> Oui</label>
-          <label className="flex items-center gap-1.5"><input type="radio" name={field.id} value="non" defaultChecked={value === false} /> Non</label>
-        </div>
-      </fieldset>
-    );
-  }
-  return (
-    <div className={field.type === "textarea" ? "sm:col-span-2" : ""}>
-      <label className="label" htmlFor={id}>
-        {field.label}
-        {field.type === "number" && field.unit ? ` (${field.unit})` : ""}
-      </label>
-      {field.type === "textarea" ? (
-        <textarea id={id} name={field.id} defaultValue={str} rows={2} className="input" />
-      ) : field.type === "select" ? (
-        <select id={id} name={field.id} defaultValue={str} className="input">
-          <option value="">—</option>
-          {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-      ) : field.type === "number" ? (
-        <input id={id} name={field.id} type="number" defaultValue={str} min={field.min} max={field.max} step="any" className="input" />
-      ) : (
-        <input id={id} name={field.id} type={field.type} defaultValue={str} placeholder={"placeholder" in field ? field.placeholder : undefined} className="input" />
-      )}
-    </div>
-  );
-}
+import { IntakeWizard } from "@/components/intake-wizard";
 
 export default async function IntakePage({ searchParams }: PageProps<"/patient/formulaire">) {
   const me = await requirePatient();
@@ -52,17 +15,16 @@ export default async function IntakePage({ searchParams }: PageProps<"/patient/f
   const { modifier, brouillon } = await searchParams;
   const submitted = Boolean(intake?.submitted_at);
   const editing = !submitted || modifier === "1";
-  const answers = intake?.answers ?? {};
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Mon questionnaire</h1>
+          <h1 className="text-2xl font-semibold">Mon questionnaire de bilan</h1>
           <p className="text-sm text-muted">
             {submitted
               ? `Envoyé le ${formatDate(intake!.submitted_at)}${intake!.updated_at !== intake!.submitted_at ? ` · mis à jour le ${formatDate(intake!.updated_at)}` : ""}`
-              : "5 minutes. Le kinésithérapeute le lit avant votre bilan de course, pour passer directement aux examens."}
+              : "5 minutes · le kinésithérapeute le lit avant votre bilan de course."}
           </p>
         </div>
         {submitted && !editing && (
@@ -70,58 +32,26 @@ export default async function IntakePage({ searchParams }: PageProps<"/patient/f
         )}
       </div>
 
-      {!intake && (
-        <div className="rounded-xl border border-brand/20 bg-brand-soft px-5 py-4 text-brand">
-          <p className="font-semibold">Bienvenue {me.first_name} !</p>
-          <p className="mt-1 text-sm">
-            Votre parcours PrépaMarathon commence par ce questionnaire. Il permet au kinésithérapeute de préparer votre bilan de
-            course. Vous pouvez l&apos;enregistrer en brouillon et le terminer plus tard.
-          </p>
-        </div>
-      )}
+      {brouillon === "1" && <Notice>Brouillon enregistré. Vous pouvez revenir le compléter à tout moment.</Notice>}
 
-      {brouillon === "1" && (
-        <div className="rounded-xl border border-brand/20 bg-brand-soft px-4 py-3 text-sm text-brand">
-          Brouillon enregistré. Vous pouvez revenir le compléter à tout moment.
-        </div>
-      )}
-
-      {!editing ? (
-        <Card>
-          <IntakeView sections={INTAKE_SECTIONS} answers={answers} />
-        </Card>
+      {editing ? (
+        <IntakeWizard
+          sections={INTAKE_SECTIONS}
+          answers={intake?.answers ?? {}}
+          firstName={me.first_name}
+          startAtIntro={!intake}
+          submitted={submitted}
+        />
       ) : (
-        <form action={saveIntake} className="space-y-5">
-          {INTAKE_SECTIONS.map((section) => (
-            <Card
-              key={section.id}
-              title={section.title}
-              action={
-                <span className="text-right text-xs text-muted">
-                  Visible par : {section.audience.map((p) => (p === "coordinateur" ? "la coordination Via Sana" : PROFESSION_LABEL[p].toLowerCase())).join(", ")}
-                </span>
-              }
-            >
-              <div className="grid gap-4 sm:grid-cols-2">
-                {section.fields.map((field) => (
-                  <Field key={field.id} field={field} value={answers[field.id]} />
-                ))}
-              </div>
-            </Card>
-          ))}
-          <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
-            <p className="max-w-md text-xs text-muted">
-              Vos réponses sont couvertes par le secret médical. Chaque praticien ne voit que les sections
-              utiles à sa spécialité ; la coordination ne voit que « Organisation ».{" "}
-              <Link href="/patient/confidentialite" className="text-brand hover:underline">En savoir plus</Link>
-            </p>
-            <div className="flex gap-2">
-              {!submitted && <SubmitButton variant="secondary" name="intent" value="draft">Enregistrer le brouillon</SubmitButton>}
-              <SubmitButton name="intent" value="submit">{submitted ? "Enregistrer les modifications" : "Envoyer à mon équipe"}</SubmitButton>
-            </div>
-          </div>
-        </form>
+        <Card>
+          <IntakeView sections={INTAKE_SECTIONS} answers={intake?.answers ?? {}} />
+        </Card>
       )}
+
+      <p className="text-center text-xs text-muted">
+        Vos réponses sont couvertes par le secret médical : chaque praticien ne voit que les rubriques utiles à sa spécialité.{" "}
+        <Link href="/patient/confidentialite" className="text-brand hover:underline">Qui voit quoi ?</Link>
+      </p>
     </div>
   );
 }

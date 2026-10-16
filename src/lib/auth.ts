@@ -82,9 +82,14 @@ export function decodeSession(token: string | undefined): Session | null {
   return null;
 }
 
+const SESSION_TABLE = { practitioner: "practitioners", patient: "patients", coordinator: "coordinators" } as const;
+
+/** The current session, or null — also when its user no longer exists (e.g. after a demo reset). */
 export async function getSession() {
   const store = await cookies();
-  return decodeSession(store.get(SESSION_COOKIE)?.value);
+  const session = decodeSession(store.get(SESSION_COOKIE)?.value);
+  if (!session) return null;
+  return get(`SELECT 1 AS ok FROM ${SESSION_TABLE[session.type]} WHERE id = ?`, session.id) ? session : null;
 }
 
 export async function startSession(session: Session) {

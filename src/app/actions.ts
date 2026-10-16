@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { endSession, requireCoordinator, requirePatient, requirePractitioner, startSession } from "@/lib/auth";
 import { db, get, resetDemoData, run, transaction } from "@/lib/db";
-import { BILAN_DIMENSIONS, COORDINATION_OFFER, INTAKE_SECTIONS, type IntakeAnswers } from "@/lib/domain";
+import { BILAN_DIMENSIONS, COORDINATION_OFFER, INTAKE_SECTIONS, needsMedicalOpinion, type IntakeAnswers } from "@/lib/domain";
 import { addCatalogStep, advance, completeStep, instantiatePhase, skipStep } from "@/lib/pathway";
 import { isInCareTeam, logAccess } from "@/lib/queries";
 
@@ -359,14 +359,16 @@ export async function saveIntake(formData: FormData) {
   const answers: IntakeAnswers = {};
   for (const section of INTAKE_SECTIONS) {
     for (const field of section.fields) {
-      if (field.type === "boolean") {
-        const v = text(formData, field.id);
-        answers[field.id] = v === "oui" ? true : v === "non" ? false : null;
-      } else if (field.type === "number") {
-        answers[field.id] = numberOrNull(formData, field.id, field.min ?? 0, field.max ?? 10000);
-      } else if (field.type === "select") {
+      if (field.type === "choice" && field.multiple) {
+        // Only known options are kept; "Aucun(e)" cancels the other ticks.
+        const picked = formData.getAll(field.id).filter((v): v is string => typeof v === "string" && field.options.includes(v));
+        const none = picked.find((v) => v.startsWith("Aucun"));
+        answers[field.id] = none ? [none] : picked;
+      } else if (field.type === "choice") {
         const v = text(formData, field.id);
         answers[field.id] = field.options.includes(v) ? v : null;
+      } else if (field.type === "number" || field.type === "range") {
+        answers[field.id] = numberOrNull(formData, field.id, field.min ?? 0, field.max ?? 10000);
       } else {
         answers[field.id] = text(formData, field.id, field.type === "textarea" ? 2000 : 200);
       }
@@ -387,8 +389,18 @@ export async function saveIntake(formData: FormData) {
       "SELECT id, status FROM enrollment_steps WHERE enrollment_id = ? AND title = 'Questionnaire en ligne'", enrollment.id,
     );
     if (formStep && formStep.status !== "realisee") completeStep(db, formStep.id);
-    // With a prescription already in hand, the medical teleconsultation is not needed.
-    if (answers.ordonnance === true) {
+    // The race given in the questionnaire becomes the goal shown everywhere (J-x).
+    const raceDate = typeof answers.date_course === "string" && /^\d{4}-\d{2}-\d{2}$/.test(answers.date_course) ? answers.date_course : null;
+    const race = typeof answers.course === "string" && answers.course ? answers.course : null;
+    run(
+      `UPDATE enrollments SET goal_date = COALESCE(?, goal_date),
+              goal_title = CASE WHEN goal_title = 'Préparer ma course' AND ? IS NOT NULL THEN ? ELSE goal_title END
+        WHERE id = ?`,
+      raceDate, race, race, enrollment.id,
+    );
+    // With a prescription already in hand, the medical teleconsultation is not
+    // needed — unless the answers show cardiovascular warning signs.
+    if (answers.ordonnance === "Oui" && !needsMedicalOpinion(answers)) {
       const tele = get<{ id: string; status: string }>(
         "SELECT id, status FROM enrollment_steps WHERE enrollment_id = ? AND title = 'Téléconsultation médecin'", enrollment.id,
       );

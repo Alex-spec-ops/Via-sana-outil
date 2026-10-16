@@ -5,8 +5,8 @@ import path from "node:path";
 import { SCHEMA, TABLES_CHILD_FIRST } from "./schema";
 import { seed } from "./seed";
 
-// Bump when the schema changes: an older demo database is rebuilt from scratch.
-const SCHEMA_VERSION = 2;
+// Bump when the schema or the demo data format changes: an older demo database is rebuilt from scratch.
+const SCHEMA_VERSION = 3;
 
 // Local: ./data/via-sana.db. On serverless hosts only /tmp is writable, so the
 // demo database lives there and is re-seeded on each cold start (fictional data).

@@ -87,8 +87,65 @@ type PatientDef = {
   goal: { title: string; detail: string; raceInWeeks?: number };
   opposed?: boolean;
   report?: boolean;
-  intake: IntakeAnswers | null;
+  /** Short patient profile, turned into questionnaire answers by `toAnswers`. */
+  intake: Profile | null;
+  /** Answers that differ from what the profile implies (demo cases). */
+  extra?: IntakeAnswers;
 };
+
+type Profile = Record<string, string | number | boolean>;
+
+/** Turns a short fictional profile into answers to the PrépaMarathon questionnaire. */
+function toAnswers(p: Profile, raceDate: string, extra: IntakeAnswers = {}): IntakeAnswers {
+  const txt = (k: string) => String(p[k] ?? "");
+  const has = (k: string, word: string) => txt(k).toLowerCase().includes(word.toLowerCase());
+  const pain = Number(p.douleur_actuelle ?? 0);
+  const zone = txt("zone_douleur").toLowerCase();
+  const zones = [
+    [/cheville|achille|pied|métatars/, "Pied / cheville"],
+    [/tibia|mollet/, "Tibia / mollet"],
+    [/genou/, "Genou"],
+    [/lombaire/, "Dos lombaire"],
+  ].filter(([re]) => (re as RegExp).test(zone)).map(([, label]) => label as string);
+  const injuries = txt("blessures");
+  return {
+    atcd_familiaux_cardio: p.cardio ? "Oui" : "Non",
+    douleur_thoracique: "Jamais",
+    malaise_effort: "Non",
+    palpitations: "Jamais",
+    essoufflement: "Jamais",
+    facteurs_risque: has("antecedents", "HTA") ? ["HTA"] : ["Aucun"],
+    tabac: "Non",
+    asthme: has("antecedents", "asthme") ? "Oui, asthme connu" : "Non",
+    toux_effort: has("antecedents", "asthme") ? "Parfois" : "Jamais",
+    douleur_course: pain === 0 ? "Aucune douleur" : pain < 3 ? "Oui, mais elle disparaît en courant" : "Oui, elle s'aggrave en courant",
+    zones_douleur: pain === 0 ? [] : zones,
+    arret_blessure: injuries && !/^(aucune|ras)$/i.test(injuries) ? "Oui" : "Non",
+    raideurs: ["Aucune"],
+    semelles: p.semelles ? "Oui, tout le temps" : "Non",
+    anti_inflammatoires: "Jamais",
+    autres_blessures: /^(aucune|ras)$/i.test(injuries) ? "" : injuries,
+    poids: (p.poids as number) ?? null,
+    taille: (p.taille as number) ?? null,
+    regime: ({ Omnivore: "Aucun", Végétalien: "Vegan" } as Record<string, string>)[txt("regime")] ?? (txt("regime") || "Aucun"),
+    fatigue_chronique: "Non",
+    fracture_fatigue: "Non",
+    chirurgie: "Non",
+    autres_antecedents: /^(ras|aucun)$/i.test(txt("antecedents")) ? "" : txt("antecedents"),
+    medicaments: /^(aucun|ras)?$/i.test(txt("traitements")) ? "Non" : "Oui",
+    km_semaine: Math.min(100, Number(p.km_semaine ?? 0)),
+    anciennete: has("niveau", "Débutant") ? "Moins de 6 mois" : has("niveau", "Confirmé") ? "Plus de 2 ans" : "6 mois à 2 ans",
+    renforcement: ["Renforcement musculaire / PPG"],
+    objectif: txt("course") ? "Préparer un semi-marathon, marathon ou trail" : "Courir pour le plaisir / la santé",
+    course: txt("course"),
+    date_course: raceDate,
+    temps_vise: txt("temps_vise"),
+    ordonnance: p.ordonnance ? "Oui" : "Non",
+    medecin_traitant: txt("medecin_traitant"),
+    disponibilites: txt("disponibilites") || "Flexible",
+    ...extra,
+  };
+}
 
 const PATIENTS: PatientDef[] = [
   {
@@ -99,6 +156,7 @@ const PATIENTS: PatientDef[] = [
   {
     id: "pa-sophie", first: "Sophie", last: "Garnier", birth: "1979-01-22", sex: "F", offer: "bilan", status: "actif", startDaysAgo: 6,
     team: [{ id: "pr-petit" }, { id: "pr-morel" }], states: "REAAA",
+    extra: { douleur_thoracique: "Une fois", essoufflement: "Parfois" },
     goal: { title: "Courir le Marathon de Bordeaux", detail: "Objectif finisher", raceInWeeks: 22 },
     intake: {
       ordonnance: false, medecin_traitant: "Dr Bernard", disponibilites: "En semaine, soir", course: "Marathon de Bordeaux", temps_vise: "4h30",
@@ -137,6 +195,7 @@ const PATIENTS: PatientDef[] = [
     team: [{ id: "pr-petit" }, { id: "pr-lefevre" }, { id: "pr-benali" }, { id: "pr-nguyen" }, { id: "pr-garcia", status: "proposee" }],
     added: [["cat-podo", 4], ["cat-diet", 4], ["cat-osteo", 6], ["cat-kine-mi", 9], ["cat-diet-course", 12], ["cat-osteo", 16]],
     states: "RNRRRRRRRREAAA", report: true,
+    extra: { raideurs: ["Chevilles"], renforcement: ["Renforcement musculaire / PPG", "Yoga / Mobilité"] },
     goal: { title: "Finir le Marathon de Paris en moins de 4h", detail: "Premier marathon", raceInWeeks: 10 },
     intake: {
       ordonnance: true, medecin_traitant: "Dr Ferrand", disponibilites: "En semaine, soir", course: "Marathon de Paris", temps_vise: "3h55",
@@ -165,6 +224,7 @@ const PATIENTS: PatientDef[] = [
     team: [{ id: "pr-petit" }, { id: "pr-morel" }, { id: "pr-lefevre" }, { id: "pr-aubert" }],
     added: [["cat-diet", 4], ["cat-psy", 6], ["cat-kine-mi", 9]],
     states: "RNRRRNRRREA", noUpcomingSession: true,
+    extra: { fatigue_chronique: "Oui, depuis plus d'un mois", fracture_fatigue: "Oui", renforcement: ["Aucun"] },
     goal: { title: "Marathon Nice-Cannes", detail: "Parcours en pause : fracture de fatigue métatarsienne", raceInWeeks: 11 },
     report: true,
     intake: {
@@ -180,6 +240,7 @@ const PATIENTS: PatientDef[] = [
     team: [{ id: "pr-roux" }, { id: "pr-benali" }, { id: "pr-nguyen" }], opposed: true,
     added: [["cat-podo", 4], ["cat-osteo", 5], ["cat-kine-renfo", 7]],
     states: "RNRRRRRRREA", report: true,
+    extra: { raideurs: ["Hanches"], anti_inflammatoires: "Exceptionnellement" },
     goal: { title: "Marathon de Lille", detail: "Syndrome de la bandelette ilio-tibiale à surveiller", raceInWeeks: 14 },
     intake: {
       ordonnance: true, medecin_traitant: "Dr Roy", disponibilites: "En semaine, soir", course: "Marathon de Lille", temps_vise: "3h45",
@@ -366,7 +427,8 @@ export function seed(db: DatabaseSync) {
 
     if (p.intake) {
       const submitted = at(start, 0, 20, 15);
-      insIntake.run(enrollmentId, JSON.stringify({ ...p.intake, date_course: p.goal.raceInWeeks ? dateOnly(now, p.goal.raceInWeeks * 7 - 1) : "" }), submitted, submitted);
+      const raceDate = p.goal.raceInWeeks ? dateOnly(now, p.goal.raceInWeeks * 7 - 1) : "";
+      insIntake.run(enrollmentId, JSON.stringify(toAnswers(p.intake, raceDate, p.extra)), submitted, submitted);
     }
 
     const report = p.report ? REPORTS[p.id] : undefined;

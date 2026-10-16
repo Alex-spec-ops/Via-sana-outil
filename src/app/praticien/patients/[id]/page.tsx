@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { addNote, saveReport, scheduleSession, setSessionStatus, updateStep } from "@/app/actions";
 import { requirePractitioner } from "@/lib/auth";
-import { BILAN_DIMENSIONS, NOTE_VISIBILITY_LABEL, PROFESSION_LABEL } from "@/lib/domain";
+import { BILAN_DIMENSIONS, NOTE_VISIBILITY_LABEL, PROFESSION_LABEL, intakeRedFlags } from "@/lib/domain";
 import { ACTION_LABEL, age, daysUntil, formatDate, formatDateTime, fullName } from "@/lib/format";
 import { getPatientFileForPractitioner, type ReportRow, type TimelineStep } from "@/lib/queries";
 import { Badge, Card, EmptyState, EnrollmentStatusBadge, Notice, OfferBadge, ProfessionTag, ProgressBar } from "@/components/ui";
@@ -77,6 +77,9 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
   const bilanStep = timeline.find((s) => s.title === "Bilan de course (30 min)");
   const canWriteReport = me.profession === "kine" && (isReferent || bilanStep?.practitioner_id === me.id);
   const openSteps = timeline.filter((s) => s.status === "a_venir" || s.status === "en_cours");
+  // Warning signs, limited to the sections this practitioner is allowed to read.
+  const visibleSections = new Set(file.intakeSections.map((s) => s.id));
+  const redFlags = intake?.submitted_at ? intakeRedFlags(intake.answers).filter((f) => visibleSections.has(f.section)) : [];
 
   const stepActions = (step: TimelineStep) => {
     if (!editable || step.status === "realisee" || step.status === "non_retenue") return null;
@@ -233,7 +236,20 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
             action={intake?.submitted_at ? <span className="text-xs text-muted">Envoyé le {formatDate(intake.submitted_at)}</span> : <Badge className="bg-danger-soft text-danger">Non envoyé</Badge>}
           >
             {intake?.submitted_at ? (
-              <IntakeView sections={file.intakeSections} answers={intake.answers} />
+              <>
+                {redFlags.length > 0 && (
+                  <div className="mb-5 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
+                    <p className="font-semibold">Points d&apos;attention dans les réponses</p>
+                    <ul className="mt-1 list-disc pl-5">
+                      {redFlags.map((f) => <li key={f.label}>{f.label}</li>)}
+                    </ul>
+                    {redFlags.some((f) => f.section === "cardio") && (
+                      <p className="mt-2 text-xs">Signes cardiovasculaires : un avis médical est recommandé avant la reprise de l&apos;effort intense.</p>
+                    )}
+                  </div>
+                )}
+                <IntakeView sections={file.intakeSections} answers={intake.answers} />
+              </>
             ) : (
               <EmptyState>Le patient n&apos;a pas encore envoyé son questionnaire.</EmptyState>
             )}
