@@ -2,6 +2,8 @@
 
 Prototype fonctionnel pour suivre un patient dans le parcours **« Préparation Marathon »** (médecin généraliste, kinésithérapeute, ostéopathe, diététicien·ne), avec une interface praticien et une interface patient simplifiée.
 
+**Démo en ligne : https://via-sana-outil.vercel.app**
+
 > Toutes les données sont **fictives**. Le prototype n'est pas un dispositif médical.
 
 ## Lancer le projet
