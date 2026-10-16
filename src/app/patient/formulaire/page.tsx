@@ -70,6 +70,16 @@ export default async function IntakePage({ searchParams }: PageProps<"/patient/f
         )}
       </div>
 
+      {!intake && (
+        <div className="rounded-xl border border-brand/20 bg-brand-soft px-5 py-4 text-brand">
+          <p className="font-semibold">Bienvenue {me.first_name} !</p>
+          <p className="mt-1 text-sm">
+            Votre parcours PrépaMarathon commence par ce questionnaire. Il permet au kinésithérapeute de préparer votre bilan de
+            course. Vous pouvez l&apos;enregistrer en brouillon et le terminer plus tard.
+          </p>
+        </div>
+      )}
+
       {brouillon === "1" && (
         <div className="rounded-xl border border-brand/20 bg-brand-soft px-4 py-3 text-sm text-brand">
           Brouillon enregistré. Vous pouvez revenir le compléter à tout moment.
@@ -88,7 +98,7 @@ export default async function IntakePage({ searchParams }: PageProps<"/patient/f
               title={section.title}
               action={
                 <span className="text-right text-xs text-muted">
-                  Visible par : {section.audience.map((p) => PROFESSION_LABEL[p].toLowerCase()).join(", ")}
+                  Visible par : {section.audience.map((p) => (p === "coordinateur" ? "la coordination Via Sana" : PROFESSION_LABEL[p].toLowerCase())).join(", ")}
                 </span>
               }
             >

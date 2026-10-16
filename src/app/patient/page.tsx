@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { addCheckin, chooseNext, decideTeamMember } from "@/app/actions";
 import { requirePatient } from "@/lib/auth";
 import { COORDINATION_OFFER, PROFESSION_LABEL } from "@/lib/domain";
@@ -15,6 +16,8 @@ export default async function PatientHome({ searchParams }: PageProps<"/patient"
   if (!space) return <EmptyState>Aucun parcours n&apos;est associé à votre compte.</EmptyState>;
   const { enrollment, timeline, sessions, notes, checkins, intake, team, reports } = space;
   const { formulaire } = await searchParams;
+  // Nothing started yet: the questionnaire comes first.
+  if (!intake && enrollment.status === "actif") redirect("/patient/formulaire");
 
   const now = new Date().toISOString();
   const upcoming = sessions.filter((s) => s.status === "prevue" && s.starts_at >= now);

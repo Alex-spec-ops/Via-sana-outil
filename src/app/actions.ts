@@ -50,7 +50,13 @@ export async function loginAs(formData: FormData) {
   if (type === "patient" && get("SELECT 1 AS ok FROM patients WHERE id = ?", id)) {
     await startSession({ type, id });
     logAccess("patient", id, id, "connexion");
-    redirect("/patient");
+    // A new client lands straight on the questionnaire, the first step of the pathway.
+    const sent = get(
+      `SELECT 1 AS ok FROM intake_forms f JOIN enrollments e ON e.id = f.enrollment_id
+        WHERE e.patient_id = ? AND f.submitted_at IS NOT NULL`,
+      id,
+    );
+    redirect(sent ? "/patient" : "/patient/formulaire");
   }
   redirect("/");
 }
