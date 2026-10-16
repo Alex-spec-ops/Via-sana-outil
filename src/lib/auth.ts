@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 import { get } from "./db";
 import type { Profession } from "./domain";
 
-// Demo authentication: the user picks a fictional persona and receives an
-// HMAC-signed, httpOnly session cookie. In production this is replaced by a
-// strong authentication (Pro Santé Connect / e-CPS for practitioners, 2FA for
-// patients) — the authorisation layer in access.ts stays the same.
+// Authentication: email + password (see passwords.ts and loginWithPassword in
+// actions.ts), then an HMAC-signed, httpOnly session cookie. In production a
+// second factor is added (Pro Santé Connect / e-CPS for practitioners, 2FA for
+// patients and coordination) — the authorisation layer in queries.ts stays the same.
 
 export const SESSION_COOKIE = "vs_session";
 const MAX_AGE_SECONDS = 60 * 60 * 8;

@@ -677,8 +677,8 @@ export async function listPersonas() {
        FROM practitioners pr
       ORDER BY CASE pr.profession WHEN 'kine' THEN 0 WHEN 'medecin' THEN 1 ELSE 2 END, pr.last_name`,
   );
-  const patients = await all<{ id: string; first_name: string; last_name: string; offer: Offer; status: EnrollmentStatus; goal_title: string }>(
-    `SELECT p.id, p.first_name, p.last_name, e.offer, e.status, e.goal_title
+  const patients = await all<{ id: string; first_name: string; last_name: string; email: string; offer: Offer; status: EnrollmentStatus; goal_title: string }>(
+    `SELECT p.id, p.first_name, p.last_name, p.email, e.offer, e.status, e.goal_title
        FROM patients p JOIN enrollments e ON e.patient_id = p.id
       ORDER BY CASE e.status WHEN 'actif' THEN 0 WHEN 'en_pause' THEN 1 ELSE 2 END, e.offer, p.last_name`,
   );

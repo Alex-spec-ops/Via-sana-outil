@@ -37,7 +37,7 @@ export function AppHeader({
             <p className="text-xs text-muted">{userDetail}</p>
           </div>
           <form action={logout}>
-            <button type="submit" className="btn btn-secondary">Changer de profil</button>
+            <button type="submit" className="btn btn-secondary">Se déconnecter</button>
           </form>
         </div>
       </div>

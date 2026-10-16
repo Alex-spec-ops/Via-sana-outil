@@ -8,6 +8,7 @@ import { get, resetDemoData, run, transaction } from "@/lib/db";
 import { BILAN_DIMENSIONS, COORDINATION_OFFER, INTAKE_SECTIONS, needsMedicalOpinion, type IntakeAnswers } from "@/lib/domain";
 import { addCatalogStep, advance, completeStep, instantiatePhase, skipStep } from "@/lib/pathway";
 import { isInCareTeam, logAccess } from "@/lib/queries";
+import { PASSWORD_MAX_LENGTH, dummyPasswordHash, hashPassword, passwordProblem, verifyPassword } from "@/lib/passwords";
 
 function text(formData: FormData, key: string, max = 2000) {
   const value = formData.get(key);
@@ -36,54 +37,109 @@ const STEP_SELECT = "SELECT id, enrollment_id, profession, title, status, option
 
 // ------------------------------------------------------------------ Session
 
-export async function loginAs(formData: FormData) {
-  const type = text(formData, "type");
-  const id = text(formData, "id", 100);
-  if (type === "coordinator" && (await get("SELECT 1 AS ok FROM coordinators WHERE id = ?", id))) {
-    await startSession({ type, id });
-    redirect("/coordination");
-  }
-  if (type === "practitioner" && (await get("SELECT 1 AS ok FROM practitioners WHERE id = ?", id))) {
-    await startSession({ type, id });
-    redirect("/praticien");
-  }
-  if (type === "patient" && (await get("SELECT 1 AS ok FROM patients WHERE id = ?", id))) {
-    await startSession({ type, id });
-    await logAccess("patient", id, id, "connexion");
-    // A new client lands straight on the questionnaire, the first step of the pathway.
-    const sent = await get(
-      `SELECT 1 AS ok FROM intake_forms f JOIN enrollments e ON e.id = f.enrollment_id
-        WHERE e.patient_id = ? AND f.submitted_at IS NOT NULL`,
-      id,
-    );
-    redirect(sent ? "/patient" : "/patient/formulaire");
-  }
-  redirect("/connexion");
+export type LoginState = { error: string | null };
+
+const LOGIN_ERROR = "Email ou mot de passe incorrect.";
+const MAX_FAILURES = 5;
+const LOCK_MINUTES = 15;
+
+type CredentialRow = { email: string; user_type: "patient" | "practitioner" | "coordinator"; user_id: string; password_hash: string; failed_count: number; locked_until: string | null };
+
+async function authLog(userType: string, userId: string, event: string) {
+  await run("INSERT INTO auth_logs (user_type, user_id, event, at) VALUES (?, ?, ?, ?)", userType, userId, event, new Date().toISOString());
+}
+
+/** Where a person lands once signed in. A new client goes straight to the questionnaire. */
+async function homeFor(type: CredentialRow["user_type"], id: string) {
+  if (type === "coordinator") return "/coordination";
+  if (type === "practitioner") return "/praticien";
+  const sent = await get(
+    `SELECT 1 AS ok FROM intake_forms f JOIN enrollments e ON e.id = f.enrollment_id
+      WHERE e.patient_id = ? AND f.submitted_at IS NOT NULL`,
+    id,
+  );
+  return sent ? "/patient" : "/patient/formulaire";
 }
 
 /**
- * A new client starts their "bilan de course" from the landing page: the
- * account, the enrolment and the bilan steps are created, the partner physio
- * who runs the bilans is attached as referent, and the client lands on the
- * questionnaire. (Demo: no password — production uses an email link + 2FA.)
+ * Email + password login (CNIL recommendation 2022-100): one generic error
+ * message whatever went wrong, the same work done for an unknown email, and the
+ * account suspended for 15 minutes after 5 failed attempts in a row. Neither the
+ * password nor an unknown email is ever written to the logs.
  */
-export async function startBilan(formData: FormData) {
+export async function loginWithPassword(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  const email = text(formData, "email", 120).toLowerCase();
+  const raw = formData.get("password");
+  const password = typeof raw === "string" ? raw.slice(0, PASSWORD_MAX_LENGTH) : "";
+  if (!email || !password) return { error: LOGIN_ERROR };
+
+  const credential = await get<CredentialRow>("SELECT * FROM credentials WHERE email = ?", email);
+  if (!credential) {
+    await verifyPassword(password, await dummyPasswordHash());
+    return { error: LOGIN_ERROR };
+  }
+  const locked = credential.locked_until !== null && credential.locked_until > new Date().toISOString();
+  const valid = await verifyPassword(password, credential.password_hash);
+  if (locked) return { error: LOGIN_ERROR };
+  if (!valid) {
+    const failures = credential.failed_count + 1;
+    const lockUntil = failures >= MAX_FAILURES ? new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString() : null;
+    await run(
+      "UPDATE credentials SET failed_count = ?, locked_until = ? WHERE email = ?",
+      lockUntil ? 0 : failures, lockUntil ?? credential.locked_until, email,
+    );
+    await authLog(credential.user_type, credential.user_id, lockUntil ? "verrouillage" : "echec");
+    return { error: LOGIN_ERROR };
+  }
+
+  await run("UPDATE credentials SET failed_count = 0, locked_until = NULL WHERE email = ?", email);
+  await authLog(credential.user_type, credential.user_id, "connexion");
+  await startSession({ type: credential.user_type, id: credential.user_id });
+  if (credential.user_type === "patient") await logAccess("patient", credential.user_id, credential.user_id, "connexion");
+  redirect(await homeFor(credential.user_type, credential.user_id));
+}
+
+export type SignupState = { error: string | null; values: Record<string, string> };
+
+/**
+ * A new client starts their "bilan de course" from the landing page: the
+ * account (with its password), the enrolment and the bilan steps are created,
+ * the partner physio who runs the bilans is attached as referent, and the
+ * client lands on the questionnaire.
+ */
+export async function startBilan(_prev: SignupState, formData: FormData): Promise<SignupState> {
   const first = text(formData, "first_name", 60);
   const last = text(formData, "last_name", 60);
-  const email = text(formData, "email", 120);
+  const email = text(formData, "email", 120).toLowerCase();
   const phone = text(formData, "phone", 30);
   const birth = text(formData, "birth_date", 10);
-  const goal = text(formData, "goal", 120) || "Préparer ma course";
+  const goalInput = text(formData, "goal", 120);
+  const goal = goalInput || "Préparer ma course";
   const sex = ["F", "M", "X"].includes(text(formData, "sex")) ? text(formData, "sex") : "X";
+  const rawPassword = formData.get("password");
+  const password = typeof rawPassword === "string" ? rawPassword : "";
+  const confirmation = formData.get("password_confirmation");
+  // Passwords are never sent back to the browser.
+  const values = { first_name: first, last_name: last, email, phone, birth_date: birth, goal: goalInput, sex };
+  const fail = (error: string): SignupState => ({ error, values });
+
   if (!first || !last || !/^\S+@\S+\.\S+$/.test(email) || !/^\d{4}-\d{2}-\d{2}$/.test(birth) || text(formData, "consent") !== "1") {
-    redirect("/commencer?erreur=1");
+    return fail("Merci de vérifier les champs obligatoires et d'accepter les conditions.");
   }
+  const weak = passwordProblem(password, [first, last, email.split("@")[0]]);
+  if (weak) return fail(weak);
+  if (password !== confirmation) return fail("Les deux mots de passe ne correspondent pas.");
+  if (await get("SELECT 1 AS ok FROM credentials WHERE email = ?", email)) {
+    return fail("Un compte existe déjà avec cet email. Connectez-vous ou utilisez une autre adresse.");
+  }
+
   const coordinator = await get<{ id: string }>("SELECT id FROM coordinators ORDER BY id LIMIT 1");
   const physio = await get<{ id: string }>(
     "SELECT id FROM practitioners WHERE profession = 'kine' ORDER BY CASE WHEN specialty LIKE '%bilans de course%' THEN 0 ELSE 1 END, last_name LIMIT 1",
   );
-  if (!coordinator || !physio) redirect("/commencer?erreur=1");
+  if (!coordinator || !physio) return fail("Inscription momentanément indisponible. Réessayez plus tard.");
 
+  const passwordHash = await hashPassword(password);
   const now = new Date().toISOString();
   const patientId = `pa-${randomUUID()}`;
   const enrollmentId = `en-${randomUUID()}`;
@@ -91,6 +147,10 @@ export async function startBilan(formData: FormData) {
     await tx.run(
       "INSERT INTO patients (id, first_name, last_name, birth_date, sex, email, phone, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       patientId, first, last, birth, sex, email, phone, now,
+    );
+    await tx.run(
+      "INSERT INTO credentials (email, user_type, user_id, password_hash, password_changed_at) VALUES (?, 'patient', ?, ?, ?)",
+      email, patientId, passwordHash, now,
     );
     await tx.run(
       `INSERT INTO enrollments (id, patient_id, pathway_id, coordinator_id, offer, status, start_date, goal_title, goal_detail)

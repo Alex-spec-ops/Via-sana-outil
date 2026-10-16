@@ -199,6 +199,28 @@ CREATE TABLE IF NOT EXISTS access_logs (
   at TEXT NOT NULL
 );
 
+-- One login per person (patient, practitioner or coordinator). Passwords are
+-- only stored as scrypt hashes (CNIL recommendation 2022-100, § 3.3).
+CREATE TABLE IF NOT EXISTS credentials (
+  email TEXT PRIMARY KEY,
+  user_type TEXT NOT NULL CHECK (user_type IN ('patient','practitioner','coordinator')),
+  user_id TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  failed_count INTEGER NOT NULL DEFAULT 0,
+  locked_until TEXT,
+  password_changed_at TEXT NOT NULL,
+  UNIQUE (user_type, user_id)
+);
+
+-- Authentication journal: never the password, never an unknown identifier (§ 3.5).
+CREATE TABLE IF NOT EXISTS auth_logs (
+  id BIGSERIAL PRIMARY KEY,
+  user_type TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  event TEXT NOT NULL CHECK (event IN ('connexion','echec','verrouillage','changement_mot_de_passe')),
+  at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_care_team_practitioner ON care_team(practitioner_id);
 CREATE INDEX IF NOT EXISTS idx_steps_enrollment ON enrollment_steps(enrollment_id, planned_week, position);
 CREATE INDEX IF NOT EXISTS idx_sessions_enrollment ON sessions(enrollment_id, starts_at);
@@ -214,7 +236,7 @@ DECLARE t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY['coordinators','practitioners','patients','pathways','pathway_steps','step_catalog',
     'enrollments','care_team','enrollment_steps','sessions','reports','external_shares','notes','checkins',
-    'intake_forms','relances','access_logs','app_meta']
+    'intake_forms','relances','access_logs','credentials','auth_logs','app_meta']
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;
@@ -227,7 +249,7 @@ END $$;
 
 /** Every table, children first — used to wipe the demo data. */
 export const TABLES_CHILD_FIRST = [
-  "access_logs", "relances", "intake_forms", "checkins", "notes", "external_shares", "reports", "sessions",
+  "auth_logs", "credentials", "access_logs", "relances", "intake_forms", "checkins", "notes", "external_shares", "reports", "sessions",
   "enrollment_steps", "care_team", "enrollments", "step_catalog", "pathway_steps", "pathways", "patients",
   "practitioners", "coordinators",
 ];

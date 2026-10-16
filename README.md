@@ -30,7 +30,7 @@ npm run dev
 
 Ouvrir http://localhost:3000 : la page d'accueil propose deux entrées.
 - « Commencer mon bilan » : inscription d'un nouveau client, qui arrive ensuite sur son questionnaire.
-- « Se connecter » : choix d'un profil fictif, sur `/connexion`.
+- « Se connecter » : email et mot de passe, sur `/connexion`. Les comptes fictifs y sont listés (un clic remplit le formulaire), avec le mot de passe de démonstration commun `Demo-ViaSana-2026`.
 
 Les données fictives sont créées automatiquement au premier lancement. Le bouton « Réinitialiser les données de démo » (page `/connexion`) remet tout à zéro.
 
@@ -75,6 +75,7 @@ L'analyse complète, avec les liens Légifrance, est dans [`docs/brief-et-cadre-
 | Strictement nécessaire | CSP L1110-4 II-III | Chaque section du questionnaire déclare ses destinataires parmi les 8 professions et la coordination (`src/lib/domain.ts`). |
 | Opposition au partage | CSP L1110-4 IV | Chaque praticien ne voit plus que ses propres notes et comptes rendus. |
 | Partage hors équipe | CSP L1110-4 III | Case de consentement obligatoire, lien à jeton révocable, chaque ouverture inscrite au journal du patient. |
+| Mots de passe | CNIL délibération 2022-100 | Hachage scrypt avec un sel aléatoire de 128 bits par compte (jamais en clair) ; au moins 14 caractères (ou 12 avec un caractère spécial) mêlant majuscules, minuscules et chiffres ; message d'erreur unique ; compte suspendu 15 min après 5 échecs ; journal `auth_logs` sans mot de passe ni identifiant inconnu. |
 | Cloisonnement et journalisation exploitée | CNIL SAN-2026-009 | Table `access_logs` (accès autorisés et refusés, praticiens, coordination, destinataires externes), visible par le patient. |
 | Pas de mise en cache de données de santé | RGPD art. 32 | Rendu 100 % dynamique, `Cache-Control: no-store`, `noindex`, `X-Frame-Options: DENY`. |
 
@@ -84,7 +85,7 @@ L'analyse complète, avec les liens Légifrance, est dans [`docs/brief-et-cadre-
 src/
   app/
     actions.ts                         Server Actions, avec contrôle d'accès par rôle
-    page.tsx                           Choix du profil (démo)
+    page.tsx                           Connexion email + mot de passe
     coordination/                      Liste des parcours + vue logistique d'un parcours
     praticien/                         Liste + fiche patient (compte rendu, notes, suivi)
     patient/                           Tableau de bord, questionnaire, « Mes données »
@@ -117,7 +118,7 @@ src/
 Avant de commencer : « Réinitialiser les données de démo » sur `/connexion`, puis retour à l'accueil.
 
 0. **Un nouveau coureur** : sur la page d'accueil, « Commencer mon bilan ».
-   - Inscription avec des informations fictives : on arrive directement sur le questionnaire.
+   - Inscription avec des informations fictives et un mot de passe : un mot de passe trop faible est refusé, puis on arrive directement sur le questionnaire.
    - « Suivant » sans répondre : les questions obligatoires sont signalées.
    - Répondre à la première page, puis « Enregistrer et finir plus tard ».
 1. **Lucie Fontaine (coordination)** : la liste des actions à faire.
@@ -139,7 +140,7 @@ Avant de commencer : « Réinitialiser les données de démo » sur `/connexion`
 
 ## Limites et suites
 
-- **Authentification de démo :** à remplacer par Pro Santé Connect / e-CPS pour les praticiens et par un double facteur pour la coordination et les patients.
+- **Authentification :** email et mot de passe (CNIL 2022-100). En production, ajouter un second facteur, recommandé par la CNIL pour les données de santé : Pro Santé Connect / e-CPS pour les praticiens, code à usage unique pour la coordination et les patients. Supprimer aussi le mot de passe de démonstration commun et ajouter la réinitialisation par email.
 - **Paiement non intégré :** l'offre à 150 € est seulement affichée ; pas de vrai rendez-vous en ligne non plus.
 - **Base de démo éphémère :** elle est recréée sur Vercel. En production : PostgreSQL chez un hébergeur HDS.
 - **Pistes :**

@@ -2,6 +2,7 @@ import type { Db } from "./db";
 import { randomUUID } from "node:crypto";
 import type { IntakeAnswers } from "./domain";
 import { instantiatePhase } from "./pathway";
+import { DEMO_PASSWORD, hashPassword } from "./passwords";
 
 // 100 % fictional demo data, modelled on the PrépaMarathon offer
 // (prepamarathon.com). Dates are relative to the moment the database is
@@ -497,5 +498,20 @@ export async function seed(db: Db) {
       await insCheckin(randomUUID(), enrollmentId, "patient", patientId, dateOnly(now, -weeksAgo * 7 - 1), value, pain[i], fatigue[i],
         i === km.length - 1 ? lastComment : "");
     }
+  }
+
+  // One login per demo account, all with the shared demo password (shown on the
+  // login page). Each hash still gets its own random salt.
+  const accounts = await db.all<{ email: string; user_type: string; user_id: string }>(
+    `SELECT email, 'coordinator' AS user_type, id AS user_id FROM coordinators
+     UNION ALL SELECT email, 'practitioner', id FROM practitioners
+     UNION ALL SELECT email, 'patient', id FROM patients`,
+  );
+  const insCredential = stmt(
+    "INSERT INTO credentials (email, user_type, user_id, password_hash, password_changed_at) VALUES (?, ?, ?, ?, ?)",
+  );
+  const hashes = await Promise.all(accounts.map(() => hashPassword(DEMO_PASSWORD)));
+  for (const [i, a] of accounts.entries()) {
+    await insCredential(a.email.toLowerCase(), a.user_type, a.user_id, hashes[i], new Date(now).toISOString());
   }
 }
