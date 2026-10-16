@@ -1,69 +1,89 @@
-import Image from "next/image";
+import { redirect } from "next/navigation";
+import { loginAs, resetDemo } from "./actions";
+import { getSession } from "@/lib/auth";
+import { listPersonas } from "@/lib/queries";
+import { PROFESSION_LABEL } from "@/lib/domain";
+import { initials } from "@/lib/format";
+import { EnrollmentStatusBadge } from "@/components/ui";
 
-export default function Home() {
+export default async function Home() {
+  const session = await getSession();
+  if (session) redirect(session.type === "practitioner" ? "/praticien" : "/patient");
+
+  const { practitioners, patients } = listPersonas();
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
+      <div className="mb-8 flex items-center gap-3">
+        <span className="flex size-11 items-center justify-center rounded-xl bg-brand text-lg font-bold text-white">VS</span>
+        <div>
+          <h1 className="text-2xl font-semibold">Via Sana · Parcours de soins coordonnés</h1>
+          <p className="text-sm text-muted">Prototype — choisissez un profil fictif pour explorer l&apos;outil.</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </div>
+
+      <div className="mb-8 rounded-xl border border-brand/20 bg-brand-soft px-4 py-3 text-sm text-brand">
+        <strong>Mode démonstration.</strong> En production, l&apos;accès praticien passe par une authentification forte
+        (Pro Santé Connect / e-CPS) et l&apos;accès patient par un identifiant personnel avec double facteur.
+        Les droits d&apos;accès affichés ensuite, eux, sont ceux de la version réelle.
+      </div>
+
+      <div className="grid gap-8 md:grid-cols-2">
+        <section>
+          <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Espace praticien</h2>
+          <ul className="space-y-2">
+            {practitioners.map((p) => (
+              <li key={p.id}>
+                <form action={loginAs}>
+                  <input type="hidden" name="type" value="practitioner" />
+                  <input type="hidden" name="id" value={p.id} />
+                  <button type="submit" className="card flex w-full items-center gap-3 p-3 text-left transition hover:border-brand">
+                    <span className="flex size-10 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand">
+                      {initials(p)}
+                    </span>
+                    <span className="flex-1">
+                      <span className="block font-medium">{[p.title, p.first_name, p.last_name].filter(Boolean).join(" ")}</span>
+                      <span className="block text-sm text-muted">{PROFESSION_LABEL[p.profession]}</span>
+                    </span>
+                    <span className="text-xs text-muted">{p.patient_count} patient{p.patient_count > 1 ? "s" : ""}</span>
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Espace patient</h2>
+          <ul className="space-y-2">
+            {patients.map((p) => (
+              <li key={p.id}>
+                <form action={loginAs}>
+                  <input type="hidden" name="type" value="patient" />
+                  <input type="hidden" name="id" value={p.id} />
+                  <button type="submit" className="card flex w-full items-center gap-3 p-3 text-left transition hover:border-brand">
+                    <span className="flex size-10 items-center justify-center rounded-full bg-upcoming-soft text-sm font-semibold text-upcoming">
+                      {initials(p)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium">{p.first_name} {p.last_name}</span>
+                      <span className="block truncate text-sm text-muted">{p.pathway_name} · {p.goal_title}</span>
+                    </span>
+                    <EnrollmentStatusBadge status={p.status} />
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-xs text-muted">
+        <p>Astuce démo : connectez-vous en kiné « Julien Petit » puis ouvrez le dossier de Karim Haddad (suivi par une autre kiné) via son URL.</p>
+        <form action={resetDemo}>
+          <button type="submit" className="btn btn-secondary text-xs">Réinitialiser les données de démo</button>
+        </form>
+      </footer>
+    </main>
   );
 }

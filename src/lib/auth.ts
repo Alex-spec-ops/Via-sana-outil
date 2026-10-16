@@ -1,0 +1,110 @@
+import "server-only";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { get } from "./db";
+import type { Profession } from "./domain";
+
+// Demo authentication: the user picks a fictional persona and receives an
+// HMAC-signed, httpOnly session cookie. In production this is replaced by a
+// strong authentication (Pro Santé Connect / e-CPS for practitioners, 2FA for
+// patients) — the authorisation layer in access.ts stays the same.
+
+export const SESSION_COOKIE = "vs_session";
+const MAX_AGE_SECONDS = 60 * 60 * 8;
+
+export type Session =
+  | { type: "practitioner"; id: string }
+  | { type: "patient"; id: string };
+
+export type PractitionerUser = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  title: string;
+  profession: Profession;
+  email: string;
+};
+
+export type PatientUser = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+};
+
+function secret() {
+  const value = process.env.SESSION_SECRET;
+  if (value) return value;
+  if (process.env.NODE_ENV === "production" && !process.env.VERCEL) {
+    throw new Error("SESSION_SECRET must be set in production");
+  }
+  return "via-sana-demo-secret-change-me";
+}
+
+function sign(payload: string) {
+  return createHmac("sha256", secret()).update(payload).digest("base64url");
+}
+
+export function encodeSession(session: Session) {
+  const payload = Buffer.from(
+    JSON.stringify({ ...session, exp: Date.now() + MAX_AGE_SECONDS * 1000 }),
+  ).toString("base64url");
+  return `${payload}.${sign(payload)}`;
+}
+
+export function decodeSession(token: string | undefined): Session | null {
+  if (!token) return null;
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature) return null;
+  const expected = Buffer.from(sign(payload));
+  const actual = Buffer.from(signature);
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString());
+    if (typeof data.exp !== "number" || data.exp < Date.now()) return null;
+    if ((data.type === "practitioner" || data.type === "patient") && typeof data.id === "string") {
+      return { type: data.type, id: data.id };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export async function getSession() {
+  const store = await cookies();
+  return decodeSession(store.get(SESSION_COOKIE)?.value);
+}
+
+export async function startSession(session: Session) {
+  const store = await cookies();
+  store.set(SESSION_COOKIE, encodeSession(session), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: MAX_AGE_SECONDS,
+  });
+}
+
+export async function endSession() {
+  const store = await cookies();
+  store.delete(SESSION_COOKIE);
+}
+
+export async function requirePractitioner(): Promise<PractitionerUser> {
+  const session = await getSession();
+  if (session?.type !== "practitioner") redirect("/");
+  const user = get<PractitionerUser>("SELECT * FROM practitioners WHERE id = ?", session.id);
+  if (!user) redirect("/");
+  return user;
+}
+
+export async function requirePatient(): Promise<PatientUser> {
+  const session = await getSession();
+  if (session?.type !== "patient") redirect("/");
+  const user = get<PatientUser>("SELECT id, first_name, last_name, email FROM patients WHERE id = ?", session.id);
+  if (!user) redirect("/");
+  return user;
+}
