@@ -45,7 +45,7 @@ function ReportForm({ enrollmentId, report }: { enrollmentId: string; report?: R
 export default async function PatientFilePage({ params }: PageProps<"/praticien/patients/[id]">) {
   const me = await requirePractitioner();
   const { id } = await params;
-  const file = getPatientFileForPractitioner(me, id);
+  const file = await getPatientFileForPractitioner(me, id);
 
   if (!file) {
     return (

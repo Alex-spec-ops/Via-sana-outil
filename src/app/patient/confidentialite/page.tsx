@@ -13,7 +13,7 @@ const COLUMNS: { id: Audience; label: string }[] = [
 
 export default async function PrivacyPage() {
   const me = await requirePatient();
-  const space = getPatientSpace(me.id);
+  const space = await getPatientSpace(me.id);
   if (!space) return <EmptyState>Aucun parcours n&apos;est associé à votre compte.</EmptyState>;
   const { enrollment, team, accessLogs, reports, shares } = space;
   const opposed = enrollment.sharing_opposed === 1;

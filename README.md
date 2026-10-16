@@ -12,7 +12,16 @@ Prototype fonctionnel pour suivre un coureur dans le parcours **PrépaMarathon**
 
 ## Lancer le projet
 
-Prérequis : **Node.js ≥ 22.13** (module natif `node:sqlite`, aucune base à installer).
+Prérequis : **Node.js 24**.
+
+**Base de données** (PostgreSQL) :
+- **Par défaut**, aucune installation : une base PostgreSQL embarquée (PGlite) est créée dans `data/pglite`.
+- **Avec Supabase** :
+  1. Créer un projet en **région UE** (Paris).
+  2. Copier `.env.example` en `.env.local`.
+  3. Y renseigner `DATABASE_URL` : la chaîne « Transaction pooler », port 6543.
+  4. Au premier lancement, le schéma et les données fictives sont créés, avec Row Level Security activée et l'accès par l'API publique fermé.
+- ⚠ **Supabase n'est pas un hébergeur certifié HDS** : données fictives uniquement (voir `docs/`, section 4).
 
 ```bash
 npm install
@@ -23,7 +32,7 @@ Ouvrir http://localhost:3000 : la page d'accueil propose deux entrées.
 - « Commencer mon bilan » : inscription d'un nouveau client, qui arrive ensuite sur son questionnaire.
 - « Se connecter » : choix d'un profil fictif, sur `/connexion`.
 
- La base SQLite est créée et remplie automatiquement dans `data/via-sana.db`. Le bouton « Réinitialiser les données de démo » de la page d'accueil remet tout à zéro.
+Les données fictives sont créées automatiquement au premier lancement. Le bouton « Réinitialiser les données de démo » (page `/connexion`) remet tout à zéro.
 
 ## Trois rôles
 
@@ -100,7 +109,7 @@ src/
 
 **Choix techniques.**
 - Next.js 16 (Server Components, Server Actions) et Tailwind CSS 4.
-- SQLite via `node:sqlite` : démo autonome, schéma transposable à PostgreSQL.
+- PostgreSQL : Supabase (région UE) via `DATABASE_URL`, sinon PGlite embarqué ; même schéma et mêmes requêtes dans les deux cas.
 - Déploiement Vercel : la base de démo est recréée à chaque démarrage à froid.
 
 ## Scénario de démonstration (≈ 8 min)

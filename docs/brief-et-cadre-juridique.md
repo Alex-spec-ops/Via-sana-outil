@@ -43,7 +43,30 @@
 
 **Point non vérifié via Légifrance.** L'article L1111-7 du CSP (droit d'accès du patient à ses informations) : la consultation a été interrompue. À confirmer.
 
-## 4. Points d'attention pour Via Sana (à aborder avec tact)
+## 4. Base de données : Supabase et hébergement des données de santé
+
+| Texte | Ce qu'il impose |
+|---|---|
+| [CSP art. R1111-8-8](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000036656709) | Le responsable de traitement qui confie l'hébergement de données de santé à un tiers **s'assure que celui-ci est certifié HDS**. |
+| [CSP art. R1111-9-1](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000053720788) (décret n° 2026-209, en vigueur le 26/09/2026) | Stockage **exclusivement dans l'UE / EEE**. Un transfert ou un accès à distance hors UE n'est permis qu'avec une décision d'adéquation, ou avec des garanties appropriées décrites dans le contrat. |
+| [CSP art. R1111-11](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000053720795) (même décret) | Contrat d'hébergement avec des clauses obligatoires : périmètre du certificat, lieux d'hébergement, réversibilité, interdiction de réutiliser les données. Il doit aussi lister les **réglementations extra-européennes** auxquelles l'hébergeur ou ses sous-traitants sont soumis. |
+
+**Ce que j'en déduis pour l'outil**
+- Supabase est un éditeur américain. À ma connaissance, il n'est **pas certifié HDS** ; c'est à vérifier sur la liste publiée par l'Agence du numérique en santé.
+- Il convient donc au **prototype, avec des données fictives**, mais pas à de vrais coureurs.
+
+**Mesures appliquées dans le prototype**
+- Projet Supabase à créer en **région UE** (Paris, eu-west-3).
+- Connexion PostgreSQL **côté serveur uniquement**, chiffrée en TLS (`ssl: require`). Aucune clé Supabase n'est exposée au navigateur.
+- **Row Level Security activée sur toutes les tables, sans aucune règle d'accès**, et droits retirés aux rôles `anon` et `authenticated`. L'API publique de Supabase (PostgREST) ne renvoie donc rien, même avec la clé publique.
+- Les règles d'accès métier (équipe de soins, coordination, partage) restent appliquées par le serveur (`src/lib/queries.ts`).
+- Sans `DATABASE_URL`, l'application utilise une base PostgreSQL embarquée (PGlite). Démo hors ligne possible, et aucune donnée ne quitte la machine.
+
+**Pour la production**
+- Le même code PostgreSQL tourne chez un **hébergeur certifié HDS**, avec stockage en UE et un contrat conforme à R1111-11.
+- Supabase étant open source, il peut aussi être auto-hébergé sur une infrastructure HDS.
+
+## 5. Points d'attention pour Via Sana (à aborder avec tact)
 
 - La [politique de confidentialité](https://prepamarathon.com/politique-de-confidentialite.html) du site ne couvre que les emails de la liste d'attente. Le questionnaire, lui, collecte des données de santé et annonce un hébergement HDS. Il manque donc une information patient dédiée à ces données : finalité, base légale, destinataires, durée de conservation, droits.
 - Le questionnaire vit sur un outil tiers (Eval&GO). Il faut vérifier sa certification HDS et le contrat de sous-traitance, ou internaliser le questionnaire, comme le fait le prototype.

@@ -11,9 +11,9 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
   const pick = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : undefined);
   const filters = { offer: pick("offre"), status: pick("statut"), step: pick("etape"), q: pick("q"), alert: pick("afaire") };
 
-  const everyone = listForCoordinator(me.id);
-  const rows = listForCoordinator(me.id, filters);
-  const upcoming = upcomingSessionsForCoordinator(me.id);
+  const everyone = await listForCoordinator(me.id);
+  const rows = await listForCoordinator(me.id, filters);
+  const upcoming = await upcomingSessionsForCoordinator(me.id);
   const stepTitles = [...new Set(everyone.map((r) => r.current_step_title).filter(Boolean))] as string[];
   const activeFilters = Object.values(filters).some(Boolean);
 

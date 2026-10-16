@@ -16,15 +16,15 @@ export default async function ReportPage({ params }: PageProps<"/compte-rendu/[i
   let view;
   let back = "/";
   if (session.type === "patient") {
-    view = getReportFor({ type: "patient", id: session.id }, id);
+    view = await getReportFor({ type: "patient", id: session.id }, id);
     back = "/patient";
   } else if (session.type === "practitioner") {
-    const user = get<PractitionerUser>("SELECT * FROM practitioners WHERE id = ?", session.id);
+    const user = await get<PractitionerUser>("SELECT * FROM practitioners WHERE id = ?", session.id);
     if (!user) redirect("/connexion");
-    view = getReportFor({ type: "practitioner", user }, id);
+    view = await getReportFor({ type: "practitioner", user }, id);
     back = view ? `/praticien/patients/${view.patient.id}` : "/praticien";
   } else {
-    view = getReportFor({ type: "coordinator", id: session.id }, id);
+    view = await getReportFor({ type: "coordinator", id: session.id }, id);
     back = "/coordination";
   }
 

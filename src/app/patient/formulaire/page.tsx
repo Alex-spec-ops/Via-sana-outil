@@ -9,7 +9,7 @@ import { IntakeWizard } from "@/components/intake-wizard";
 
 export default async function IntakePage({ searchParams }: PageProps<"/patient/formulaire">) {
   const me = await requirePatient();
-  const space = getPatientSpace(me.id);
+  const space = await getPatientSpace(me.id);
   if (!space) return <EmptyState>Aucun parcours n&apos;est associé à votre compte.</EmptyState>;
   const { intake } = space;
   const { modifier, brouillon } = await searchParams;

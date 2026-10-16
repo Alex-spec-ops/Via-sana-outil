@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS relances (
 );
 
 CREATE TABLE IF NOT EXISTS access_logs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id BIGSERIAL PRIMARY KEY,
   actor_type TEXT NOT NULL CHECK (actor_type IN ('patient','practitioner','coordinator','external')),
   actor_id TEXT NOT NULL,
   patient_id TEXT NOT NULL REFERENCES patients(id),
@@ -204,6 +204,25 @@ CREATE INDEX IF NOT EXISTS idx_steps_enrollment ON enrollment_steps(enrollment_i
 CREATE INDEX IF NOT EXISTS idx_sessions_enrollment ON sessions(enrollment_id, starts_at);
 CREATE INDEX IF NOT EXISTS idx_notes_enrollment ON notes(enrollment_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_access_logs_patient ON access_logs(patient_id, at);
+
+-- Lock the tables against Supabase's public API (PostgREST / anon key): row
+-- level security with no policy denies every row to the API roles, and their
+-- privileges are revoked. The app reaches the database server side only, as the
+-- table owner, and applies its own authorisation rules (queries.ts).
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['coordinators','practitioners','patients','pathways','pathway_steps','step_catalog',
+    'enrollments','care_team','enrollment_steps','sessions','reports','external_shares','notes','checkins',
+    'intake_forms','relances','access_logs','app_meta']
+  LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+    REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+  END IF;
+END $$;
 `;
 
 /** Every table, children first — used to wipe the demo data. */

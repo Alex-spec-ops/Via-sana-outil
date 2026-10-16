@@ -1,4 +1,4 @@
-import type { DatabaseSync } from "node:sqlite";
+import type { Db } from "./db";
 import { randomUUID } from "node:crypto";
 import type { IntakeAnswers } from "./domain";
 import { instantiatePhase } from "./pathway";
@@ -319,144 +319,150 @@ const REPORTS: Record<string, { findings: Record<string, string>; recommendation
   },
 };
 
-export function seed(db: DatabaseSync) {
+const ascii = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+export async function seed(db: Db) {
   const now = Date.now();
+  // One prepared-statement-like helper per INSERT, run on the given connection.
+  const stmt = (sql: string) => (...params: (string | number | null)[]) => db.run(sql, ...params);
 
-  db.prepare("INSERT INTO coordinators (id, first_name, last_name, email) VALUES (?, ?, ?, ?)")
-    .run(COORDINATOR.id, COORDINATOR.first, COORDINATOR.last, "lucie.fontaine@viasana.example");
+  await db.run(
+    "INSERT INTO coordinators (id, first_name, last_name, email) VALUES (?, ?, ?, ?)",
+    COORDINATOR.id, COORDINATOR.first, COORDINATOR.last, "lucie.fontaine@viasana.example",
+  );
 
-  const insPract = db.prepare(
+  const insPract = stmt(
     "INSERT INTO practitioners (id, first_name, last_name, title, profession, specialty, location, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
   for (const p of PRACTITIONERS) {
-    insPract.run(p.id, p.first, p.last, p.title, p.profession, p.specialty, p.location,
-      `${p.first.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")}.${p.last.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")}@partenaire.example`);
+    await insPract(p.id, p.first, p.last, p.title, p.profession, p.specialty, p.location, `${ascii(p.first)}.${ascii(p.last)}@partenaire.example`);
   }
 
-  db.prepare("INSERT INTO pathways (id, name, description) VALUES (?, ?, ?)").run(PATHWAY.id, PATHWAY.name, PATHWAY.description);
-  const insStep = db.prepare(
+  await db.run("INSERT INTO pathways (id, name, description) VALUES (?, ?, ?)", PATHWAY.id, PATHWAY.name, PATHWAY.description);
+  const insStep = stmt(
     "INSERT INTO pathway_steps (id, pathway_id, phase, position, title, description, profession, optional, week_offset) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   );
-  PATHWAY.steps.forEach((s, i) =>
-    insStep.run(`${PATHWAY.id}-s${i + 1}`, PATHWAY.id, s.phase, i + 1, s.title, s.description, s.profession, s.optional, s.week),
-  );
-  const insCatalog = db.prepare("INSERT INTO step_catalog (id, title, description, profession) VALUES (?, ?, ?, ?)");
-  for (const c of CATALOG) insCatalog.run(c.id, c.title, c.description, c.profession);
+  for (const [i, s] of PATHWAY.steps.entries()) {
+    await insStep(`${PATHWAY.id}-s${i + 1}`, PATHWAY.id, s.phase, i + 1, s.title, s.description, s.profession, s.optional, s.week);
+  }
+  const insCatalog = stmt("INSERT INTO step_catalog (id, title, description, profession) VALUES (?, ?, ?, ?)");
+  for (const c of CATALOG) await insCatalog(c.id, c.title, c.description, c.profession);
 
-  const insPatient = db.prepare(
+  const insPatient = stmt(
     "INSERT INTO patients (id, first_name, last_name, birth_date, sex, email, phone, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
-  const insEnrollment = db.prepare(
+  const insEnrollment = stmt(
     `INSERT INTO enrollments (id, patient_id, pathway_id, coordinator_id, offer, status, start_date, coordinated_until, goal_title, goal_date, goal_detail, sharing_opposed, consent_updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
-  const insTeam = db.prepare(
+  const insTeam = stmt(
     "INSERT INTO care_team (enrollment_id, practitioner_id, status, is_referent, proposed_at, decided_at) VALUES (?, ?, ?, ?, ?, ?)",
   );
-  const insAdded = db.prepare(
+  const insAdded = stmt(
     `INSERT INTO enrollment_steps (id, enrollment_id, template_step_id, phase, position, planned_week, title, description, profession, optional, status, practitioner_id)
-     SELECT ?, ?, NULL, 'parcours', ?, ?, title, description, profession, 0, 'a_venir',
+     SELECT CAST(? AS TEXT), CAST(? AS TEXT), NULL, 'parcours', CAST(? AS INTEGER), CAST(? AS INTEGER), title, description, profession, 0, 'a_venir',
             (SELECT pr.id FROM care_team ct JOIN practitioners pr ON pr.id = ct.practitioner_id
-              WHERE ct.enrollment_id = ? AND ct.status = 'acceptee' AND pr.profession = step_catalog.profession ORDER BY ct.is_referent DESC LIMIT 1)
-       FROM step_catalog WHERE id = ?`,
+              WHERE ct.enrollment_id = CAST(? AS TEXT) AND ct.status = 'acceptee' AND pr.profession = step_catalog.profession
+              ORDER BY ct.is_referent DESC LIMIT 1)
+       FROM step_catalog WHERE id = CAST(? AS TEXT)`,
   );
-  const updStep = db.prepare("UPDATE enrollment_steps SET status = ?, completed_at = ?, summary = ? WHERE id = ?");
-  const insSession = db.prepare(
+  const updStep = stmt("UPDATE enrollment_steps SET status = ?, completed_at = ?, summary = ? WHERE id = ?");
+  const insSession = stmt(
     "INSERT INTO sessions (id, enrollment_id, enrollment_step_id, practitioner_id, starts_at, duration_min, location, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
-  const insIntake = db.prepare("INSERT INTO intake_forms (enrollment_id, answers, submitted_at, updated_at) VALUES (?, ?, ?, ?)");
-  const insReport = db.prepare(
+  const insIntake = stmt("INSERT INTO intake_forms (enrollment_id, answers, submitted_at, updated_at) VALUES (?, ?, ?, ?)");
+  const insReport = stmt(
     `INSERT INTO reports (id, enrollment_id, enrollment_step_id, author_id, title, findings, recommendations, action_plan, created_at, published_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
-  const insLog = db.prepare(
-    "INSERT INTO access_logs (actor_type, actor_id, patient_id, action, allowed, at) VALUES (?, ?, ?, ?, ?, ?)",
-  );
+  const insLog = stmt("INSERT INTO access_logs (actor_type, actor_id, patient_id, action, allowed, at) VALUES (?, ?, ?, ?, ?, ?)");
   const locationOf = (prId: string) => PRACTITIONERS.find((p) => p.id === prId)?.location ?? "";
 
-  PATIENTS.forEach((p, index) => {
+  for (const [index, p] of PATIENTS.entries()) {
     const start = now - p.startDaysAgo * DAY;
     const enrollmentId = `en-${p.id.slice(3)}`;
-    insPatient.run(
-      p.id, p.first, p.last, p.birth, p.sex,
-      `${p.first.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")}.${p.last.toLowerCase()}@exemple.fr`,
-      `06 00 00 0${index} ${10 + index}`, at(start, -1),
-    );
-    insEnrollment.run(
+    await insPatient(p.id, p.first, p.last, p.birth, p.sex, `${ascii(p.first)}.${p.last.toLowerCase()}@exemple.fr`, `06 00 00 0${index} ${10 + index}`, at(start, -1));
+    await insEnrollment(
       enrollmentId, p.id, PATHWAY.id, COORDINATOR.id, p.offer, p.status, dateOnly(start, 0),
       p.offer === "parcours" ? dateOnly(start, 14 + 182) : null,
       p.goal.title, p.goal.raceInWeeks !== undefined ? dateOnly(now, p.goal.raceInWeeks * 7 - 1) : null,
       p.goal.detail, p.opposed ? 1 : 0, p.opposed ? at(now, -10, 18, 12) : null,
     );
-    p.team.forEach((m, i) =>
-      insTeam.run(enrollmentId, m.id, m.status ?? "acceptee", i === 0 ? 1 : 0,
-        at(start, m.status ? p.startDaysAgo - 1 : 0, 9), m.status ? null : at(start, 0, 18)),
+    for (const [i, m] of p.team.entries()) {
+      await insTeam(enrollmentId, m.id, m.status ?? "acceptee", i === 0 ? 1 : 0,
+        at(start, m.status ? p.startDaysAgo - 1 : 0, 9), m.status ? null : at(start, 0, 18));
+    }
+
+    await instantiatePhase(db, enrollmentId, "bilan");
+    if (p.offer === "parcours") await instantiatePhase(db, enrollmentId, "parcours");
+    for (const [i, [catalogId, week]] of (p.added ?? []).entries()) {
+      await insAdded(randomUUID(), enrollmentId, 20 + i, week, enrollmentId, catalogId);
+    }
+
+    const steps = await db.all<{ id: string; profession: string; planned_week: number; title: string; practitioner_id: string | null }>(
+      "SELECT id, profession, planned_week, title, practitioner_id FROM enrollment_steps WHERE enrollment_id = ? ORDER BY planned_week, position",
+      enrollmentId,
     );
-
-    instantiatePhase(db, enrollmentId, "bilan");
-    if (p.offer === "parcours") instantiatePhase(db, enrollmentId, "parcours");
-    (p.added ?? []).forEach(([catalogId, week], i) => insAdded.run(randomUUID(), enrollmentId, 20 + i, week, enrollmentId, catalogId));
-
-    const steps = db
-      .prepare("SELECT id, profession, planned_week, title, practitioner_id FROM enrollment_steps WHERE enrollment_id = ? ORDER BY planned_week, position")
-      .all(enrollmentId) as { id: string; profession: string; planned_week: number; title: string; practitioner_id: string | null }[];
 
     let upcomingPlanned = false;
     const perWeek: Record<number, number> = {};
-    steps.forEach((step, i) => {
+    for (const [i, step] of steps.entries()) {
       const code = p.states[i] ?? "A";
       const status = { R: "realisee", N: "non_retenue", E: "en_cours", A: "a_venir" }[code] ?? "a_venir";
       // Steps of the same week happen on consecutive days, in plan order.
       perWeek[step.planned_week] = (perWeek[step.planned_week] ?? -1) + 1;
       const day = step.planned_week * 7 + perWeek[step.planned_week];
-      updStep.run(
+      await updStep(
         status, status === "realisee" ? at(start, step.profession === "patient" && step.planned_week === 0 ? 0 : day, 17) : null,
         status === "realisee" && !["patient", "coordinateur"].includes(step.profession) ? "Séance réalisée, compte rendu partagé avec l'équipe." : "",
         step.id,
       );
-      if (!step.practitioner_id) return;
+      if (!step.practitioner_id) continue;
       if (status === "realisee") {
-        insSession.run(randomUUID(), enrollmentId, step.id, step.practitioner_id, weekdayAt(start, day, 9 + (i % 8)), 30, locationOf(step.practitioner_id), "realisee");
+        await insSession(randomUUID(), enrollmentId, step.id, step.practitioner_id, weekdayAt(start, day, 9 + (i % 8)), 30, locationOf(step.practitioner_id), "realisee");
       } else if ((status === "en_cours" || (status === "a_venir" && !upcomingPlanned)) && p.status === "actif" && !p.noUpcomingSession) {
-        insSession.run(randomUUID(), enrollmentId, step.id, step.practitioner_id,
-          weekdayAt(now, (status === "en_cours" ? 2 : 6) + (index % 4), 9 + (index % 8), 30), step.profession === "kine" && step.title.startsWith("Bilan de course") ? 30 : 45,
+        await insSession(randomUUID(), enrollmentId, step.id, step.practitioner_id,
+          weekdayAt(now, (status === "en_cours" ? 2 : 6) + (index % 4), 9 + (index % 8), 30),
+          step.profession === "kine" && step.title.startsWith("Bilan de course") ? 30 : 45,
           locationOf(step.practitioner_id), "prevue");
         upcomingPlanned = true;
       }
-    });
+    }
 
     if (p.intake) {
       const submitted = at(start, 0, 20, 15);
       const raceDate = p.goal.raceInWeeks ? dateOnly(now, p.goal.raceInWeeks * 7 - 1) : "";
-      insIntake.run(enrollmentId, JSON.stringify(toAnswers(p.intake, raceDate, p.extra)), submitted, submitted);
+      await insIntake(enrollmentId, JSON.stringify(toAnswers(p.intake, raceDate, p.extra)), submitted, submitted);
     }
 
     const report = p.report ? REPORTS[p.id] : undefined;
     if (report) {
       const planStep = steps.find((s) => s.title === "Plan d'action remis");
-      const author = p.team[0].id;
-      insReport.run(
-        `rp-${p.id.slice(3)}`, enrollmentId, planStep?.id ?? null, author, "Bilan de course", JSON.stringify(report.findings),
+      await insReport(
+        `rp-${p.id.slice(3)}`, enrollmentId, planStep?.id ?? null, p.team[0].id, "Bilan de course", JSON.stringify(report.findings),
         report.recommendations, report.plan, at(start, 8, 16), at(start, 8, 16, 30),
       );
     }
 
-    insLog.run("practitioner", p.team[0].id, p.id, "consultation_fiche", 1, at(now, -2, 9, 40));
-    insLog.run("coordinator", COORDINATOR.id, p.id, "consultation_logistique", 1, at(now, -1, 11, 5));
-  });
+    await insLog("practitioner", p.team[0].id, p.id, "consultation_fiche", 1, at(now, -2, 9, 40));
+    await insLog("coordinator", COORDINATOR.id, p.id, "consultation_logistique", 1, at(now, -1, 11, 5));
+  }
 
   // Marc shared his bilan with his usual physiotherapist (outside the care team).
-  db.prepare(
+  await db.run(
     "INSERT INTO external_shares (id, enrollment_id, report_id, recipient_name, recipient_role, token, consent_at, last_access_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-  ).run(randomUUID(), "en-marc", "rp-marc", "Pauline Girard", "Kinésithérapeute habituelle", "demo-partage-marc", at(now, -20, 19), at(now, -19, 8, 30));
-  insLog.run("external", "Pauline Girard", "pa-marc", "lecture_partage_externe", 1, at(now, -19, 8, 30));
+    randomUUID(), "en-marc", "rp-marc", "Pauline Girard", "Kinésithérapeute habituelle", "demo-partage-marc", at(now, -20, 19), at(now, -19, 8, 30),
+  );
+  await insLog("external", "Pauline Girard", "pa-marc", "lecture_partage_externe", 1, at(now, -19, 8, 30));
 
   // A first reminder already sent to Hugo for his questionnaire.
-  db.prepare("INSERT INTO relances (id, enrollment_id, coordinator_id, channel, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(randomUUID(), "en-hugo", COORDINATOR.id, "email", "Questionnaire en ligne non rempli", at(now, -1, 10, 0));
+  await db.run(
+    "INSERT INTO relances (id, enrollment_id, coordinator_id, channel, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    randomUUID(), "en-hugo", COORDINATOR.id, "email", "Questionnaire en ligne non rempli", at(now, -1, 10, 0),
+  );
 
   // Follow-up notes
-  const insNote = db.prepare("INSERT INTO notes (id, enrollment_id, author_id, body, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)");
+  const insNote = stmt("INSERT INTO notes (id, enrollment_id, author_id, body, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)");
   const notes: [string, string, string, "equipe" | "privee" | "patient", number][] = [
     ["en-lea", "pr-petit", "Foulée sur tapis : attaque talon corrigée partiellement, cadence 162. Poursuivre le travail de cadence.", "equipe", -30],
     ["en-lea", "pr-petit", "Pensez à vos exercices de gainage après chaque sortie : 3 séries de 30 secondes suffisent.", "patient", -30],
@@ -473,11 +479,11 @@ export function seed(db: DatabaseSync) {
     ["en-antoine", "pr-benali", "Bassin en antéversion, traitement lombo-pelvien.", "equipe", -12],
   ];
   for (const [enrollmentId, author, body, visibility, days] of notes) {
-    insNote.run(randomUUID(), enrollmentId, author, body, visibility, at(now, days, 17, 30));
+    await insNote(randomUUID(), enrollmentId, author, body, visibility, at(now, days, 17, 30));
   }
 
   // Weekly check-ins (patient self-reports, coordinated pathway only)
-  const insCheckin = db.prepare(
+  const insCheckin = stmt(
     "INSERT INTO checkins (id, enrollment_id, author_type, author_id, date, weekly_km, pain, fatigue, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   );
   const checkins: [string, string, number[], number[], number[], string][] = [
@@ -486,10 +492,10 @@ export function seed(db: DatabaseSync) {
     ["en-antoine", "pa-antoine", [24, 26, 30], [3, 2, 2], [3, 3, 3], ""],
   ];
   for (const [enrollmentId, patientId, km, pain, fatigue, lastComment] of checkins) {
-    km.forEach((value, i) => {
+    for (const [i, value] of km.entries()) {
       const weeksAgo = km.length - 1 - i;
-      insCheckin.run(randomUUID(), enrollmentId, "patient", patientId, dateOnly(now, -weeksAgo * 7 - 1), value, pain[i], fatigue[i],
+      await insCheckin(randomUUID(), enrollmentId, "patient", patientId, dateOnly(now, -weeksAgo * 7 - 1), value, pain[i], fatigue[i],
         i === km.length - 1 ? lastComment : "");
-    });
+    }
   }
 }

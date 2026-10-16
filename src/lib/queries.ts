@@ -27,15 +27,15 @@ import {
 
 export type ActorType = "patient" | "practitioner" | "coordinator" | "external";
 
-export function logAccess(actorType: ActorType, actorId: string, patientId: string, action: string, allowed = true) {
-  run(
+export async function logAccess(actorType: ActorType, actorId: string, patientId: string, action: string, allowed = true) {
+  await run(
     "INSERT INTO access_logs (actor_type, actor_id, patient_id, action, allowed, at) VALUES (?, ?, ?, ?, ?, ?)",
     actorType, actorId, patientId, action, allowed ? 1 : 0, new Date().toISOString(),
   );
 }
 
 /** True only if the patient has accepted this practitioner in their care team. */
-export function isInCareTeam(practitionerId: string, enrollmentId: string) {
+export async function isInCareTeam(practitionerId: string, enrollmentId: string) {
   return Boolean(
     get("SELECT 1 AS ok FROM care_team WHERE practitioner_id = ? AND enrollment_id = ? AND status = 'acceptee'", practitionerId, enrollmentId),
   );
@@ -181,8 +181,8 @@ const ENROLLMENT_SELECT = `
 
 const PATIENT_SELECT = "SELECT id, first_name, last_name, birth_date, sex, email, phone FROM patients WHERE id = ?";
 
-function getTeam(enrollmentId: string) {
-  return all<TeamMember>(
+async function getTeam(enrollmentId: string) {
+  return await all<TeamMember>(
     `SELECT pr.id, pr.first_name, pr.last_name, pr.title, pr.profession, pr.specialty, pr.location,
             ct.status, ct.is_referent, ct.proposed_at, ct.decided_at
        FROM care_team ct JOIN practitioners pr ON pr.id = ct.practitioner_id
@@ -192,8 +192,8 @@ function getTeam(enrollmentId: string) {
   );
 }
 
-function getTimeline(enrollmentId: string) {
-  return all<TimelineStep>(
+async function getTimeline(enrollmentId: string) {
+  return await all<TimelineStep>(
     `SELECT es.id, es.phase, es.position, es.planned_week, es.title, es.description, es.profession, es.optional, es.status,
             es.completed_at, es.summary, es.practitioner_id,
             CASE WHEN pr.id IS NULL THEN NULL ELSE TRIM(pr.title || ' ' || pr.first_name || ' ' || pr.last_name) END AS practitioner_name
@@ -205,8 +205,8 @@ function getTimeline(enrollmentId: string) {
   );
 }
 
-function getSessions(enrollmentId: string) {
-  return all<SessionRow>(
+async function getSessions(enrollmentId: string) {
+  return await all<SessionRow>(
     `SELECT s.id, s.starts_at, s.duration_min, s.location, s.status, s.practitioner_id, s.enrollment_step_id,
             TRIM(pr.title || ' ' || pr.first_name || ' ' || pr.last_name) AS practitioner_name, pr.profession, es.title AS step_title
        FROM sessions s
@@ -218,15 +218,15 @@ function getSessions(enrollmentId: string) {
   );
 }
 
-function getCheckins(enrollmentId: string) {
-  return all<CheckinRow>(
+async function getCheckins(enrollmentId: string) {
+  return await all<CheckinRow>(
     "SELECT id, date, weekly_km, pain, fatigue, comment, author_type FROM checkins WHERE enrollment_id = ? ORDER BY date DESC",
     enrollmentId,
   );
 }
 
-function getIntake(enrollmentId: string): IntakeRow | null {
-  const row = get<{ answers: string; submitted_at: string | null; updated_at: string }>(
+async function getIntake(enrollmentId: string): Promise<IntakeRow | null> {
+  const row = await get<{ answers: string; submitted_at: string | null; updated_at: string }>(
     "SELECT answers, submitted_at, updated_at FROM intake_forms WHERE enrollment_id = ?",
     enrollmentId,
   );
@@ -243,15 +243,16 @@ function parseReport(row: Omit<ReportRow, "findings"> & { findings: string }): R
   return { ...row, findings: JSON.parse(row.findings) as Record<string, string> };
 }
 
-function getReports(enrollmentId: string) {
-  return all<Omit<ReportRow, "findings"> & { findings: string }>(
+async function getReports(enrollmentId: string): Promise<ReportRow[]> {
+  const rows = await all<Omit<ReportRow, "findings"> & { findings: string }>(
     `${REPORT_SELECT} WHERE r.enrollment_id = ? ORDER BY r.created_at DESC`,
     enrollmentId,
-  ).map(parseReport);
+  );
+  return rows.map(parseReport);
 }
 
-function getAccessLogs(patientId: string, limit = 30) {
-  return all<AccessLogRow>(
+async function getAccessLogs(patientId: string, limit = 30) {
+  return await all<AccessLogRow>(
     `SELECT l.id, l.actor_type, l.action, l.allowed, l.at, pr.profession,
             CASE l.actor_type
               WHEN 'patient' THEN 'Le patient'
@@ -332,8 +333,8 @@ const STATUS_ORDER = "CASE e.status WHEN 'actif' THEN 0 WHEN 'en_pause' THEN 1 E
 
 export type PractitionerListRow = ListRow & { last_pain: number | null; is_referent: number };
 
-export function listPatientsForPractitioner(practitionerId: string, filters: ListFilters = {}) {
-  const rows = all<PractitionerListRow>(
+export async function listPatientsForPractitioner(practitionerId: string, filters: ListFilters = {}) {
+  const rows = await all<PractitionerListRow>(
     `SELECT ${LIST_COLUMNS}, ct.is_referent,
             (SELECT c.pain FROM checkins c WHERE c.enrollment_id = e.id ORDER BY c.date DESC LIMIT 1) AS last_pain
        FROM care_team ct JOIN enrollments e ON e.id = ct.enrollment_id ${LIST_JOINS}
@@ -366,8 +367,8 @@ export type UpcomingSession = {
   practitioner_name?: string;
 };
 
-export function upcomingSessionsForPractitioner(practitionerId: string, limit = 6) {
-  return all<UpcomingSession>(
+export async function upcomingSessionsForPractitioner(practitionerId: string, limit = 6) {
+  return await all<UpcomingSession>(
     `SELECT s.id, s.starts_at, s.duration_min, s.location, p.id AS patient_id, p.first_name, p.last_name, es.title AS step_title
        FROM sessions s
        JOIN enrollments e ON e.id = s.enrollment_id
@@ -401,10 +402,10 @@ export type PractitionerPatientFile = {
  * Loads a patient file for a practitioner, or returns null (and logs a refused
  * access) when the patient has not accepted them in the care team.
  */
-export function getPatientFileForPractitioner(practitioner: PractitionerUser, patientId: string): PractitionerPatientFile | null {
-  const patient = get<PatientRow>(PATIENT_SELECT, patientId);
+export async function getPatientFileForPractitioner(practitioner: PractitionerUser, patientId: string): Promise<PractitionerPatientFile | null> {
+  const patient = await get<PatientRow>(PATIENT_SELECT, patientId);
   if (!patient) return null;
-  const enrollment = get<EnrollmentRow>(
+  const enrollment = await get<EnrollmentRow>(
     `${ENROLLMENT_SELECT}
        JOIN care_team ct ON ct.enrollment_id = e.id AND ct.practitioner_id = ? AND ct.status = 'acceptee'
       WHERE e.patient_id = ?
@@ -412,15 +413,15 @@ export function getPatientFileForPractitioner(practitioner: PractitionerUser, pa
     practitioner.id, patientId,
   );
   if (!enrollment) {
-    logAccess("practitioner", practitioner.id, patientId, "consultation_fiche", false);
+    await logAccess("practitioner", practitioner.id, patientId, "consultation_fiche", false);
     return null;
   }
-  logAccess("practitioner", practitioner.id, patientId, "consultation_fiche");
+  await logAccess("practitioner", practitioner.id, patientId, "consultation_fiche");
 
   // With the patient's opposition (CSP L1110-4 IV), practitioners keep only what
   // they produced themselves; nothing written by colleagues is shared.
   const opposed = enrollment.sharing_opposed === 1;
-  const allNotes = all<NoteRow>(
+  const allNotes = await all<NoteRow>(
     `SELECT n.id, n.body, n.visibility, n.created_at, n.author_id, pr.profession,
             TRIM(pr.title || ' ' || pr.first_name || ' ' || pr.last_name) AS author_name
        FROM notes n JOIN practitioners pr ON pr.id = n.author_id
@@ -429,7 +430,7 @@ export function getPatientFileForPractitioner(practitioner: PractitionerUser, pa
     enrollment.id,
   );
   const notes = allNotes.filter((n) => n.author_id === practitioner.id || (!opposed && n.visibility !== "privee"));
-  const reports = getReports(enrollment.id).filter(
+  const reports = (await getReports(enrollment.id)).filter(
     (r) => r.author_id === practitioner.id || (!opposed && r.published_at !== null),
   );
   const intakeSections = visibleSectionsFor(practitioner.profession);
@@ -437,24 +438,24 @@ export function getPatientFileForPractitioner(practitioner: PractitionerUser, pa
   return {
     patient,
     enrollment,
-    team: getTeam(enrollment.id),
-    timeline: getTimeline(enrollment.id),
-    sessions: getSessions(enrollment.id),
+    team: await getTeam(enrollment.id),
+    timeline: await getTimeline(enrollment.id),
+    sessions: await getSessions(enrollment.id),
     notes,
     hiddenNotesCount: opposed ? allNotes.filter((n) => n.author_id !== practitioner.id && n.visibility !== "privee").length : 0,
     reports,
-    checkins: getCheckins(enrollment.id),
-    intake: getIntake(enrollment.id),
+    checkins: await getCheckins(enrollment.id),
+    intake: await getIntake(enrollment.id),
     intakeSections,
     hiddenIntakeSections: visibleSectionsFor("patient").filter((s) => !intakeSections.includes(s)),
-    accessLogs: getAccessLogs(patientId, 15),
+    accessLogs: await getAccessLogs(patientId, 15),
   };
 }
 
 // --------------------------------------------------------- Coordinator: list
 
-export function listForCoordinator(coordinatorId: string, filters: ListFilters = {}) {
-  const rows = all<ListRow>(
+export async function listForCoordinator(coordinatorId: string, filters: ListFilters = {}) {
+  const rows = await all<ListRow>(
     `SELECT ${LIST_COLUMNS}
        FROM enrollments e ${LIST_JOINS}
       WHERE e.coordinator_id = :co
@@ -486,8 +487,8 @@ export function coordinationTodos(r: ListRow) {
   return todos;
 }
 
-export function upcomingSessionsForCoordinator(coordinatorId: string, limit = 8) {
-  return all<UpcomingSession>(
+export async function upcomingSessionsForCoordinator(coordinatorId: string, limit = 8) {
+  return await all<UpcomingSession>(
     `SELECT s.id, s.starts_at, s.duration_min, s.location, p.id AS patient_id, p.first_name, p.last_name, es.title AS step_title,
             TRIM(pr.title || ' ' || pr.first_name || ' ' || pr.last_name) AS practitioner_name
        FROM sessions s
@@ -524,20 +525,20 @@ export type LogisticsFile = {
 };
 
 /** The coordinator's view: logistics only. Clinical fields are never selected. */
-export function getLogisticsFile(coordinator: CoordinatorUser, patientId: string): LogisticsFile | null {
-  const patient = get<PatientRow>(PATIENT_SELECT, patientId);
+export async function getLogisticsFile(coordinator: CoordinatorUser, patientId: string): Promise<LogisticsFile | null> {
+  const patient = await get<PatientRow>(PATIENT_SELECT, patientId);
   if (!patient) return null;
-  const enrollment = get<EnrollmentRow>(
+  const enrollment = await get<EnrollmentRow>(
     `${ENROLLMENT_SELECT} WHERE e.patient_id = ? AND e.coordinator_id = ? ORDER BY e.start_date DESC LIMIT 1`,
     patientId, coordinator.id,
   );
   if (!enrollment) {
-    logAccess("coordinator", coordinator.id, patientId, "consultation_logistique", false);
+    await logAccess("coordinator", coordinator.id, patientId, "consultation_logistique", false);
     return null;
   }
-  logAccess("coordinator", coordinator.id, patientId, "consultation_logistique");
+  await logAccess("coordinator", coordinator.id, patientId, "consultation_logistique");
 
-  const intake = getIntake(enrollment.id);
+  const intake = await getIntake(enrollment.id);
   const organisation = visibleSectionsFor("coordinateur");
   const organisationAnswers: IntakeAnswers = {};
   for (const section of organisation) for (const f of section.fields) organisationAnswers[f.id] = intake?.answers[f.id] ?? null;
@@ -545,23 +546,23 @@ export function getLogisticsFile(coordinator: CoordinatorUser, patientId: string
   return {
     patient,
     enrollment,
-    team: getTeam(enrollment.id),
+    team: await getTeam(enrollment.id),
     // Step titles and statuses are logistics; the practitioners' summaries are not.
-    timeline: getTimeline(enrollment.id).map((s) => ({ ...s, summary: "" })),
-    sessions: getSessions(enrollment.id),
+    timeline: (await getTimeline(enrollment.id)).map((s) => ({ ...s, summary: "" })),
+    sessions: await getSessions(enrollment.id),
     intakeSubmittedAt: intake?.submitted_at ?? null,
     organisation,
     organisationAnswers,
     reportPublished: Boolean(get("SELECT 1 AS ok FROM reports WHERE enrollment_id = ? AND published_at IS NOT NULL", enrollment.id)),
-    relances: all<RelanceRow>("SELECT id, channel, reason, created_at FROM relances WHERE enrollment_id = ? ORDER BY created_at DESC", enrollment.id),
-    partners: all<PartnerRow>(
+    relances: await all<RelanceRow>("SELECT id, channel, reason, created_at FROM relances WHERE enrollment_id = ? ORDER BY created_at DESC", enrollment.id),
+    partners: await all<PartnerRow>(
       `SELECT id, first_name, last_name, title, profession, specialty, location FROM practitioners
         WHERE id NOT IN (SELECT practitioner_id FROM care_team WHERE enrollment_id = ?)
         ORDER BY profession, last_name`,
       enrollment.id,
     ),
-    catalog: all<CatalogRow>("SELECT * FROM step_catalog ORDER BY profession, title"),
-    accessLogs: getAccessLogs(patientId, 15),
+    catalog: await all<CatalogRow>("SELECT * FROM step_catalog ORDER BY profession, title"),
+    accessLogs: await getAccessLogs(patientId, 15),
   };
 }
 
@@ -581,9 +582,9 @@ export type PatientSpace = {
   accessLogs: AccessLogRow[];
 };
 
-export function getPatientSpace(patientId: string): PatientSpace | null {
-  const patient = get<PatientRow>(PATIENT_SELECT, patientId);
-  const enrollment = get<EnrollmentRow>(
+export async function getPatientSpace(patientId: string): Promise<PatientSpace | null> {
+  const patient = await get<PatientRow>(PATIENT_SELECT, patientId);
+  const enrollment = await get<EnrollmentRow>(
     `${ENROLLMENT_SELECT} WHERE e.patient_id = ? ORDER BY CASE e.status WHEN 'termine' THEN 1 ELSE 0 END, e.start_date DESC LIMIT 1`,
     patientId,
   );
@@ -591,11 +592,11 @@ export function getPatientSpace(patientId: string): PatientSpace | null {
   return {
     patient,
     enrollment,
-    team: getTeam(enrollment.id),
-    timeline: getTimeline(enrollment.id),
-    sessions: getSessions(enrollment.id),
+    team: await getTeam(enrollment.id),
+    timeline: await getTimeline(enrollment.id),
+    sessions: await getSessions(enrollment.id),
     // The patient sees the notes written for them, never internal team notes.
-    notes: all<NoteRow>(
+    notes: await all<NoteRow>(
       `SELECT n.id, n.body, n.visibility, n.created_at, n.author_id, pr.profession,
               TRIM(pr.title || ' ' || pr.first_name || ' ' || pr.last_name) AS author_name
          FROM notes n JOIN practitioners pr ON pr.id = n.author_id
@@ -603,11 +604,11 @@ export function getPatientSpace(patientId: string): PatientSpace | null {
         ORDER BY n.created_at DESC`,
       enrollment.id,
     ),
-    reports: getReports(enrollment.id).filter((r) => r.published_at !== null),
-    shares: all<ShareRow>("SELECT * FROM external_shares WHERE enrollment_id = ? ORDER BY consent_at DESC", enrollment.id),
-    checkins: getCheckins(enrollment.id),
-    intake: getIntake(enrollment.id),
-    accessLogs: getAccessLogs(patientId),
+    reports: (await getReports(enrollment.id)).filter((r) => r.published_at !== null),
+    shares: await all<ShareRow>("SELECT * FROM external_shares WHERE enrollment_id = ? ORDER BY consent_at DESC", enrollment.id),
+    checkins: await getCheckins(enrollment.id),
+    intake: await getIntake(enrollment.id),
+    accessLogs: await getAccessLogs(patientId),
   };
 }
 
@@ -621,12 +622,12 @@ type Viewer =
   | { type: "coordinator"; id: string };
 
 /** A report as its reader is allowed to see it, or null. Every attempt is logged. */
-export function getReportFor(viewer: Viewer, reportId: string): ReportView | null {
-  const raw = get<Omit<ReportRow, "findings"> & { findings: string }>(`${REPORT_SELECT} WHERE r.id = ?`, reportId);
+export async function getReportFor(viewer: Viewer, reportId: string): Promise<ReportView | null> {
+  const raw = await get<Omit<ReportRow, "findings"> & { findings: string }>(`${REPORT_SELECT} WHERE r.id = ?`, reportId);
   if (!raw) return null;
   const report = parseReport(raw);
-  const enrollment = get<EnrollmentRow>(`${ENROLLMENT_SELECT} WHERE e.id = ?`, report.enrollment_id)!;
-  const patient = get<PatientRow>(PATIENT_SELECT, enrollment.patient_id)!;
+  const enrollment = (await get<EnrollmentRow>(`${ENROLLMENT_SELECT} WHERE e.id = ?`, report.enrollment_id))!;
+  const patient = (await get<PatientRow>(PATIENT_SELECT, enrollment.patient_id))!;
 
   let allowed = false;
   let actorType: ActorType = "patient";
@@ -638,27 +639,27 @@ export function getReportFor(viewer: Viewer, reportId: string): ReportView | nul
     actorType = "practitioner";
     actorId = viewer.user.id;
     allowed =
-      isInCareTeam(viewer.user.id, enrollment.id) &&
+      await isInCareTeam(viewer.user.id, enrollment.id) &&
       (report.author_id === viewer.user.id || (report.published_at !== null && enrollment.sharing_opposed === 0));
   } else {
     // The coordinator organises the pathway but is not a health professional.
     actorType = "coordinator";
     actorId = viewer.id;
   }
-  logAccess(actorType, actorId, patient.id, "lecture_compte_rendu", allowed);
+  await logAccess(actorType, actorId, patient.id, "lecture_compte_rendu", allowed);
   return allowed ? { report, patient, enrollment } : null;
 }
 
 /** A report opened through an external share link (practitioner outside the team). */
-export function getSharedReport(token: string): (ReportView & { share: ShareRow }) | null {
-  const share = get<ShareRow & { enrollment_id: string }>("SELECT * FROM external_shares WHERE token = ?", token);
+export async function getSharedReport(token: string): Promise<(ReportView & { share: ShareRow }) | null> {
+  const share = await get<ShareRow & { enrollment_id: string }>("SELECT * FROM external_shares WHERE token = ?", token);
   if (!share || share.revoked_at) return null;
-  const raw = get<Omit<ReportRow, "findings"> & { findings: string }>(`${REPORT_SELECT} WHERE r.id = ? AND r.published_at IS NOT NULL`, share.report_id);
+  const raw = await get<Omit<ReportRow, "findings"> & { findings: string }>(`${REPORT_SELECT} WHERE r.id = ? AND r.published_at IS NOT NULL`, share.report_id);
   if (!raw) return null;
-  const enrollment = get<EnrollmentRow>(`${ENROLLMENT_SELECT} WHERE e.id = ?`, share.enrollment_id)!;
-  const patient = get<PatientRow>(PATIENT_SELECT, enrollment.patient_id)!;
-  run("UPDATE external_shares SET last_access_at = ? WHERE id = ?", new Date().toISOString(), share.id);
-  logAccess("external", share.recipient_name, patient.id, "lecture_partage_externe");
+  const enrollment = (await get<EnrollmentRow>(`${ENROLLMENT_SELECT} WHERE e.id = ?`, share.enrollment_id))!;
+  const patient = (await get<PatientRow>(PATIENT_SELECT, enrollment.patient_id))!;
+  await run("UPDATE external_shares SET last_access_at = ? WHERE id = ?", new Date().toISOString(), share.id);
+  await logAccess("external", share.recipient_name, patient.id, "lecture_partage_externe");
   return { report: parseReport(raw), patient, enrollment, share };
 }
 
@@ -666,17 +667,17 @@ export const DIMENSIONS = BILAN_DIMENSIONS;
 
 // ---------------------------------------------------------------- Demo login
 
-export function listPersonas() {
-  const coordinators = all<CoordinatorUser & { patient_count: number }>(
+export async function listPersonas() {
+  const coordinators = await all<CoordinatorUser & { patient_count: number }>(
     `SELECT co.*, (SELECT COUNT(*) FROM enrollments e WHERE e.coordinator_id = co.id AND e.status <> 'termine') AS patient_count
        FROM coordinators co`,
   );
-  const practitioners = all<PractitionerUser & { patient_count: number }>(
+  const practitioners = await all<PractitionerUser & { patient_count: number }>(
     `SELECT pr.*, (SELECT COUNT(*) FROM care_team ct WHERE ct.practitioner_id = pr.id AND ct.status = 'acceptee') AS patient_count
        FROM practitioners pr
       ORDER BY CASE pr.profession WHEN 'kine' THEN 0 WHEN 'medecin' THEN 1 ELSE 2 END, pr.last_name`,
   );
-  const patients = all<{ id: string; first_name: string; last_name: string; offer: Offer; status: EnrollmentStatus; goal_title: string }>(
+  const patients = await all<{ id: string; first_name: string; last_name: string; offer: Offer; status: EnrollmentStatus; goal_title: string }>(
     `SELECT p.id, p.first_name, p.last_name, e.offer, e.status, e.goal_title
        FROM patients p JOIN enrollments e ON e.patient_id = p.id
       ORDER BY CASE e.status WHEN 'actif' THEN 0 WHEN 'en_pause' THEN 1 ELSE 2 END, e.offer, p.last_name`,

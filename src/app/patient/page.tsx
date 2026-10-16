@@ -12,7 +12,7 @@ import { SubmitButton } from "@/components/submit-button";
 
 export default async function PatientHome({ searchParams }: PageProps<"/patient">) {
   const me = await requirePatient();
-  const space = getPatientSpace(me.id);
+  const space = await getPatientSpace(me.id);
   if (!space) return <EmptyState>Aucun parcours n&apos;est associé à votre compte.</EmptyState>;
   const { enrollment, timeline, sessions, notes, checkins, intake, team, reports } = space;
   const { formulaire } = await searchParams;

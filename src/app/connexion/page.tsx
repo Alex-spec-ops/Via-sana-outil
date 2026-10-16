@@ -25,7 +25,7 @@ export default async function ConnexionPage() {
   const session = await getSession();
   if (session) redirect(HOME[session.type]);
 
-  const { coordinators, practitioners, patients } = listPersonas();
+  const { coordinators, practitioners, patients } = await listPersonas();
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10">

@@ -9,7 +9,7 @@ import { Card, Notice } from "@/components/ui";
 // soon as the patient revokes it, and every opening is in the patient's journal.
 export default async function SharedReportPage({ params }: PageProps<"/partage/[token]">) {
   const { token } = await params;
-  const view = getSharedReport(token);
+  const view = await getSharedReport(token);
 
   if (!view) {
     return (

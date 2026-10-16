@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 // Every page shows per-user health data: nothing is prerendered or cached
 // (Cache Components off), and responses are marked no-store / noindex.
 const nextConfig: NextConfig = {
+  // Database drivers run as plain Node modules (PGlite ships a WASM binary).
+  serverExternalPackages: ["@electric-sql/pglite", "postgres"],
   turbopack: {
     root: __dirname,
     rules: {

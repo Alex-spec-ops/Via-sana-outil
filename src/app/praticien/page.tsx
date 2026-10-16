@@ -11,9 +11,9 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
   const pick = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : undefined);
   const filters = { offer: pick("offre"), status: pick("statut"), step: pick("etape"), q: pick("q"), alert: pick("alerte") };
 
-  const everyone = listPatientsForPractitioner(me.id);
-  const patients = listPatientsForPractitioner(me.id, filters);
-  const upcoming = upcomingSessionsForPractitioner(me.id);
+  const everyone = await listPatientsForPractitioner(me.id);
+  const patients = await listPatientsForPractitioner(me.id, filters);
+  const upcoming = await upcomingSessionsForPractitioner(me.id);
   const stepTitles = [...new Set(everyone.map((r) => r.current_step_title).filter(Boolean))] as string[];
   const activeFilters = Object.values(filters).some(Boolean);
 

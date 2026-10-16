@@ -22,7 +22,7 @@ const CHANNEL_LABEL = { email: "Email", sms: "SMS", telephone: "Téléphone" } a
 export default async function CoordinationFilePage({ params }: PageProps<"/coordination/patients/[id]">) {
   const me = await requireCoordinator();
   const { id } = await params;
-  const file = getLogisticsFile(me, id);
+  const file = await getLogisticsFile(me, id);
   if (!file) {
     return (
       <Card>
