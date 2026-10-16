@@ -12,7 +12,7 @@ export default async function PatientLayout({ children }: LayoutProps<"/patient"
         userDetail="Patient"
         nav={[
           { href: "/patient", label: "Mon parcours" },
-          { href: "/patient/formulaire", label: "Mon formulaire" },
+          { href: "/patient/formulaire", label: "Mon questionnaire" },
           { href: "/patient/confidentialite", label: "Mes données" },
         ]}
       />

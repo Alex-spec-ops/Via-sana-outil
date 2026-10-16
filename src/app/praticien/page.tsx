@@ -1,33 +1,26 @@
 import Link from "next/link";
 import { requirePractitioner } from "@/lib/auth";
-import { ENROLLMENT_STATUS_LABEL, PROFESSION_LABEL } from "@/lib/domain";
+import { ENROLLMENT_STATUS_LABEL, OFFER_LABEL, PROFESSION_LABEL } from "@/lib/domain";
 import { age, formatDate, formatDateTime } from "@/lib/format";
-import {
-  listPathwaySteps,
-  listPathways,
-  listPatientsForPractitioner,
-  patientAlerts,
-  upcomingSessionsForPractitioner,
-} from "@/lib/queries";
-import { Badge, Card, EmptyState, EnrollmentStatusBadge, ProgressBar } from "@/components/ui";
+import { clinicalAlerts, listPatientsForPractitioner, upcomingSessionsForPractitioner } from "@/lib/queries";
+import { Badge, Card, EmptyState, EnrollmentStatusBadge, OfferBadge, ProgressBar } from "@/components/ui";
 
 export default async function PatientsPage({ searchParams }: PageProps<"/praticien">) {
   const me = await requirePractitioner();
   const params = await searchParams;
   const pick = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : undefined);
-  const filters = { pathway: pick("parcours"), status: pick("statut"), step: pick("etape"), q: pick("q"), alert: pick("alerte") };
+  const filters = { offer: pick("offre"), status: pick("statut"), step: pick("etape"), q: pick("q"), alert: pick("alerte") };
 
   const everyone = listPatientsForPractitioner(me.id);
   const patients = listPatientsForPractitioner(me.id, filters);
-  const pathways = listPathways();
-  const steps = listPathwaySteps(filters.pathway);
   const upcoming = upcomingSessionsForPractitioner(me.id);
+  const stepTitles = [...new Set(everyone.map((r) => r.current_step_title).filter(Boolean))] as string[];
   const activeFilters = Object.values(filters).some(Boolean);
 
   const stats = [
     { label: "Patients suivis", value: everyone.filter((p) => p.status !== "termine").length },
-    { label: "Parcours actifs", value: everyone.filter((p) => p.status === "actif").length },
-    { label: "À surveiller", value: everyone.filter((p) => patientAlerts(p).length > 0).length, href: "/praticien?alerte=1" },
+    { label: "Dont parcours coordonnés", value: everyone.filter((p) => p.offer === "parcours" && p.status !== "termine").length },
+    { label: "À surveiller", value: everyone.filter((p) => clinicalAlerts(p).length > 0).length, href: "/praticien?alerte=1" },
     { label: "Mes séances à venir", value: upcoming.length },
   ];
 
@@ -35,9 +28,7 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Bonjour {me.first_name}</h1>
-        <p className="text-sm text-muted">
-          Vous voyez uniquement les patients dont vous faites partie de l&apos;équipe de soins.
-        </p>
+        <p className="text-sm text-muted">Vous voyez uniquement les patients qui vous ont accepté dans leur équipe de soins.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -60,31 +51,17 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
         <Card className="min-w-0">
           <form className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1.3fr_auto]" method="get">
             <input name="q" defaultValue={filters.q} placeholder="Rechercher un patient…" className="input" aria-label="Rechercher" />
-            <select name="parcours" defaultValue={filters.pathway ?? ""} className="input" aria-label="Parcours">
-              <option value="">Tous les parcours</option>
-              {pathways.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+            <select name="offre" defaultValue={filters.offer ?? ""} className="input" aria-label="Offre">
+              <option value="">Toutes les offres</option>
+              {Object.entries(OFFER_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
             <select name="statut" defaultValue={filters.status ?? ""} className="input" aria-label="Statut">
               <option value="">Tous les statuts</option>
-              {Object.entries(ENROLLMENT_STATUS_LABEL).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
+              {Object.entries(ENROLLMENT_STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
             <select name="etape" defaultValue={filters.step ?? ""} className="input" aria-label="Étape en cours">
               <option value="">Toutes les étapes</option>
-              {pathways
-                .filter((pw) => !filters.pathway || pw.id === filters.pathway)
-                .map((pw) => (
-                  <optgroup key={pw.id} label={pw.name}>
-                    {steps.filter((s) => s.pathway_id === pw.id).map((s) => (
-                      <option key={`${pw.id}:${s.position}`} value={`${pw.id}:${s.position}`}>
-                        {s.position}. {s.title}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
+              {stepTitles.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
             <div className="flex gap-2">
               <button className="btn btn-primary" type="submit">Filtrer</button>
@@ -100,7 +77,7 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted uppercase">
                     <th className="px-5 py-2 font-medium">Patient</th>
-                    <th className="px-3 py-2 font-medium">Parcours</th>
+                    <th className="px-3 py-2 font-medium">Offre</th>
                     <th className="px-3 py-2 font-medium">Étape en cours</th>
                     <th className="px-3 py-2 font-medium">Progression</th>
                     <th className="px-3 py-2 font-medium">Prochaine séance</th>
@@ -109,9 +86,9 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
                 </thead>
                 <tbody>
                   {patients.map((p) => {
-                    const alerts = patientAlerts(p);
+                    const alerts = clinicalAlerts(p);
                     return (
-                      <tr key={p.enrollment_id} className="border-b border-border last:border-0 hover:bg-background">
+                      <tr key={p.enrollment_id} className="border-b border-border align-top last:border-0 hover:bg-background">
                         <td className="px-5 py-3">
                           <Link href={`/praticien/patients/${p.patient_id}`} className="font-medium text-brand hover:underline">
                             {p.first_name} {p.last_name}
@@ -119,23 +96,19 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
                           <p className="text-xs text-muted">{age(p.birth_date)} ans · {p.goal_title}</p>
                           {alerts.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
-                              {alerts.map((a) => (
-                                <Badge key={a} className="bg-danger-soft text-danger">{a}</Badge>
-                              ))}
+                              {alerts.map((a) => <Badge key={a} className="bg-danger-soft text-danger">{a}</Badge>)}
                             </div>
                           )}
                         </td>
-                        <td className="px-3 py-3">{p.pathway_name}</td>
+                        <td className="px-3 py-3"><OfferBadge offer={p.offer} /></td>
                         <td className="px-3 py-3">
                           {p.current_step_title ? (
                             <>
-                              <p>{p.current_step_position}. {p.current_step_title}</p>
-                              {p.current_step_profession && (
-                                <p className="text-xs text-muted">{PROFESSION_LABEL[p.current_step_profession]}</p>
-                              )}
+                              <p>{p.current_step_title}</p>
+                              {p.current_step_profession && <p className="text-xs text-muted">{PROFESSION_LABEL[p.current_step_profession]}</p>}
                             </>
                           ) : (
-                            <span className="text-muted">Parcours terminé</span>
+                            <span className="text-muted">Terminé</span>
                           )}
                         </td>
                         <td className="px-3 py-3"><ProgressBar done={p.done_steps} total={p.total_steps} /></td>

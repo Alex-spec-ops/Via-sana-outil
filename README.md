@@ -1,87 +1,129 @@
-# Via Sana — outil de suivi des parcours de soins coordonnés
+# Via Sana — outil de coordination du parcours PrépaMarathon
 
-Prototype fonctionnel pour suivre un patient dans le parcours **« Préparation Marathon »** (médecin généraliste, kinésithérapeute, ostéopathe, diététicien·ne), avec une interface praticien et une interface patient simplifiée.
+Prototype fonctionnel pour suivre un coureur dans le parcours **PrépaMarathon** ([prepamarathon.com](https://prepamarathon.com/)) :
+1. un questionnaire en ligne ;
+2. un bilan de course avec un kiné du sport ;
+3. la remise d'un plan d'action ;
+4. au choix du patient, un parcours coordonné de 6 mois avec une équipe pluridisciplinaire.
 
 **Démo en ligne : https://via-sana-outil.vercel.app**
 
-> Toutes les données sont **fictives**. Le prototype n'est pas un dispositif médical.
+> Toutes les personnes et données sont **fictives**. Le prototype n'est pas un dispositif médical.
 
 ## Lancer le projet
 
-Prérequis : **Node.js ≥ 22.13** (utilise le module natif `node:sqlite`, aucune base à installer).
+Prérequis : **Node.js ≥ 22.13** (module natif `node:sqlite`, aucune base à installer).
 
 ```bash
 npm install
 npm run dev
 ```
 
-Ouvrir http://localhost:3000 et choisir un profil fictif. La base SQLite est créée et remplie automatiquement au premier lancement dans `data/via-sana.db`. Le bouton « Réinitialiser les données de démo » (page d'accueil) remet le jeu de données à zéro.
+Ouvrir http://localhost:3000 et choisir un profil fictif. La base SQLite est créée et remplie automatiquement dans `data/via-sana.db`. Le bouton « Réinitialiser les données de démo » de la page d'accueil remet tout à zéro.
 
-## Ce que fait l'outil
+## Trois rôles
 
-**Interface praticien**
-- Liste des patients **limitée à ceux dont le praticien fait partie de l'équipe de soins**, avec recherche et filtres par parcours, statut et étape en cours, plus un filtre « à surveiller » (formulaire non rempli, douleur ≥ 5/10, parcours en pause).
-- Fiche patient : identité, objectif et échéance (J-x), progression, équipe de soins, timeline des étapes (réalisées / en cours / à venir), séances à venir et historique, notes de suivi, suivi hebdomadaire déclaré par le patient, formulaire préalable, journal des accès.
-- Actions : ajouter une note (visibilité équipe / privée / patient), démarrer ou clôturer une étape avec un compte rendu (l'étape suivante devient « en cours »), planifier / clôturer / annuler une séance, changer le statut du parcours.
+**Coordination Via Sana** (`/coordination`)
+- Tous les parcours, avec des actions à faire calculées à partir des données logistiques : questionnaire non envoyé (J+x), séance à planifier, plan d'action à remettre, choix de la suite en attente, équipe en attente de validation, fin de coordination proche.
+- Sur chaque parcours :
+  - proposer un praticien du réseau ;
+  - ajouter une étape du catalogue selon les besoins du bilan ;
+  - planifier une séance avec un membre de l'équipe ;
+  - retirer une étape optionnelle ;
+  - enregistrer une relance (email, SMS, téléphone) ;
+  - changer le statut du parcours.
+- **Ne voit jamais le contenu clinique** : ni les réponses de santé, ni les notes, ni les comptes rendus. Via Sana n'est pas un établissement de santé.
 
-**Interface patient**
-- Tableau de bord : objectif et compte à rebours, progression, étape en cours, prochaines séances, timeline du parcours, conseils de l'équipe.
-- Formulaire préalable : brouillon, envoi (valide automatiquement la 1re étape), consultation et modification.
-- Suivi hebdomadaire : kilomètres, douleur, fatigue, commentaire — visible par l'équipe.
-- « Mes données » : équipe de soins, matrice de ce que chaque profession voit du formulaire, **opposition au partage** activable/révocable, **journal de qui a consulté le dossier**.
+**Praticiens partenaires** (`/praticien`)
+- Uniquement les patients qui les ont acceptés dans leur équipe. Filtres par offre, statut et étape ; vue « À surveiller » (douleur ≥ 5/10, questionnaire manquant, pause).
+- La fiche patient regroupe :
+  - les étapes ;
+  - le **compte rendu du bilan de course**, structuré sur les 6 dimensions du site, avec un plan d'action publié en PDF ;
+  - les notes (équipe, privée, visible par le patient) ;
+  - le suivi hebdomadaire ;
+  - les sections du questionnaire utiles à leur profession ;
+  - les séances et le journal des accès.
+
+**Patient** (`/patient`)
+- Tableau de bord : objectif et J-x, étape en cours, prochaines séances, plan d'action en PDF.
+- Choix « m'arrêter au bilan » ou « continuer en parcours coordonné (150 €, 6 mois) ».
+- Validation des praticiens proposés par la coordination.
+- Questionnaire (brouillon puis envoi) et suivi hebdomadaire.
+- « Mes données » : qui voit quoi, opposition au partage, **partage du bilan avec son médecin traitant ou son kiné habituel** (consentement explicite, lien révocable, ouvertures tracées), journal des accès.
 
 ## Protection des données : du texte de loi au code
 
-Analyse détaillée et sources Légifrance : [`docs/brief-et-cadre-juridique.md`](docs/brief-et-cadre-juridique.md).
+L'analyse complète, avec les liens Légifrance, est dans [`docs/brief-et-cadre-juridique.md`](docs/brief-et-cadre-juridique.md).
 
 | Exigence | Source | Implémentation |
 |---|---|---|
-| Accès réservé aux professionnels qui participent à la prise en charge | CSP L1110-4, L1110-12 | Table `care_team` ; chaque lecture et chaque action serveur vérifie l'appartenance (`src/lib/queries.ts`, `src/app/actions.ts`). Un accès hors équipe affiche « Accès refusé » et est journalisé. |
-| Partage limité aux informations **strictement nécessaires** | CSP L1110-4 II-III | Formulaire découpé en sections avec une liste de professions destinataires (`src/lib/domain.ts`) : le kiné ne voit pas l'alimentation, la diététicienne ne voit pas les blessures. Notes « privées » réservées à leur auteur. |
-| Droit d'opposition au partage, à tout moment | CSP L1110-4 IV | Bouton côté patient ; chaque praticien ne voit alors plus que ses propres notes, avec un bandeau explicatif. |
-| Cloisonnement des dossiers et journalisation exploitée | CNIL SAN-2026-009, recommandation journalisation | Table `access_logs` (accès autorisés **et refusés**), visible par le patient et par l'équipe. |
-| Hébergement certifié HDS, en UE | CSP L1111-8 | Hors périmètre du prototype (données fictives) ; prévu pour la production. |
-| Pas de mise en cache de données de santé | Sécurité (RGPD art. 32) | Rendu 100 % dynamique, `Cache-Control: no-store`, `noindex`, `X-Frame-Options: DENY` (`next.config.ts`). |
-| Clôture d'une étape par la profession concernée | Responsabilité de chaque professionnel | Seule la profession de l'étape (ou le médecin référent) peut la marquer réalisée. |
+| Accès réservé à l'équipe de soins reconnue par le patient | CSP L1110-4, L1110-12 2° | Un praticien est **proposé** par la coordination et n'accède au dossier qu'**après acceptation** par le patient. Vérification à chaque lecture et action serveur (`src/lib/queries.ts`, `src/app/actions.ts`). |
+| La coordination n'est pas un professionnel de santé | Statut de Via Sana | Vue logistique dédiée (`getLogisticsFile`) qui ne sélectionne aucun champ clinique. Tentative de lecture d'un compte rendu refusée et tracée. |
+| Strictement nécessaire | CSP L1110-4 II-III | Chaque section du questionnaire déclare ses destinataires parmi les 8 professions et la coordination (`src/lib/domain.ts`). |
+| Opposition au partage | CSP L1110-4 IV | Chaque praticien ne voit plus que ses propres notes et comptes rendus. |
+| Partage hors équipe | CSP L1110-4 III | Case de consentement obligatoire, lien à jeton révocable, chaque ouverture inscrite au journal du patient. |
+| Cloisonnement et journalisation exploitée | CNIL SAN-2026-009 | Table `access_logs` (accès autorisés et refusés, praticiens, coordination, destinataires externes), visible par le patient. |
+| Pas de mise en cache de données de santé | RGPD art. 32 | Rendu 100 % dynamique, `Cache-Control: no-store`, `noindex`, `X-Frame-Options: DENY`. |
 
 ## Architecture
 
 ```
 src/
   app/
-    page.tsx                         Choix du profil (démo)
-    actions.ts                       Server Actions : toutes les écritures, avec contrôle d'accès
-    praticien/page.tsx               Liste + filtres + agenda
-    praticien/patients/[id]/page.tsx Fiche patient
-    patient/page.tsx                 Tableau de bord patient
-    patient/formulaire/page.tsx      Formulaire préalable
-    patient/confidentialite/page.tsx Équipe, opposition, journal des accès
+    actions.ts                         Server Actions, avec contrôle d'accès par rôle
+    page.tsx                           Choix du profil (démo)
+    coordination/                      Liste des parcours + vue logistique d'un parcours
+    praticien/                         Liste + fiche patient (compte rendu, notes, suivi)
+    patient/                           Tableau de bord, questionnaire, « Mes données »
+    compte-rendu/[id]/                 Compte rendu imprimable en PDF (patient, équipe)
+    partage/[token]/                   Bilan partagé avec un praticien hors équipe
   lib/
-    schema.ts   Modèle relationnel (SQL)
-    seed.ts     Jeu de données fictif, dates relatives à « aujourd'hui »
-    db.ts       Connexion node:sqlite
-    auth.ts     Session signée HMAC (cookie httpOnly)
-    queries.ts  Lectures avec autorisation (équipe de soins, visibilité des notes, sections du formulaire)
-    domain.ts   Types, libellés, définition du formulaire préalable
-  components/   Timeline, tableaux, badges…
-  proxy.ts      Redirection optimiste des visiteurs non connectés
+    schema.ts    Modèle relationnel (SQL)
+    pathway.ts   Règles du parcours : phases, étape en cours, étapes optionnelles, catalogue
+    queries.ts   Lectures avec autorisation (3 rôles + partage externe)
+    seed.ts      Jeu de données fictif (8 coureurs, 8 praticiens, 1 coordinatrice)
+    domain.ts    Professions, offres, questionnaire, dimensions du bilan
+    auth.ts      Session signée HMAC (cookie httpOnly)
 ```
 
-**Modèle de données** : `pathways` et `pathway_steps` décrivent le parcours type. `enrollments` relie un patient à un parcours (objectif, statut, opposition). `care_team` matérialise l'équipe de soins. `enrollment_steps` suit l'avancement de chaque étape. Les tables `sessions`, `notes`, `checkins`, `intake_forms` et `access_logs` complètent le modèle.
+**Modèle de données.**
+- `pathways` et `pathway_steps` décrivent le parcours type, en deux phases (bilan, puis parcours coordonné).
+- `step_catalog` liste les étapes ajoutables selon les besoins.
+- `enrollments` porte l'offre, le statut, l'échéance de coordination et l'opposition.
+- `care_team` porte le statut de chaque praticien : proposé, accepté ou refusé.
+- `enrollment_steps` contient le plan propre à chaque patient.
+- Le reste : `sessions`, `reports`, `external_shares`, `notes`, `checkins`, `intake_forms`, `relances`, `access_logs`.
 
-Le parcours est un **modèle réutilisable** : un second parcours (« Reprise de la course après blessure ») est fourni pour montrer qu'on gère plusieurs parcours et plusieurs patients en parallèle.
+**Choix techniques.**
+- Next.js 16 (Server Components, Server Actions) et Tailwind CSS 4.
+- SQLite via `node:sqlite` : démo autonome, schéma transposable à PostgreSQL.
+- Déploiement Vercel : la base de démo est recréée à chaque démarrage à froid.
 
-**Choix techniques** : Next.js 16 (App Router, Server Components, Server Actions), Tailwind CSS 4, SQLite via `node:sqlite`. Le serveur porte toute la logique d'autorisation, rien n'est exposé au navigateur sans contrôle. SQLite rend la démo autonome ; le schéma SQL se transpose tel quel à PostgreSQL (hébergeur HDS) pour la production.
+## Scénario de démonstration (≈ 6 min)
 
-## Scénario de démonstration (≈ 5 min)
-
-1. **Julien Petit (kiné)** : il voit 5 patients sur 8. Il ouvre Léa Martin : la section « alimentation » est masquée, et la note privée de l'ostéopathe n'apparaît pas. Il clôture « Point mi-parcours kiné » avec un compte rendu, et l'étape suivante passe « en cours ».
-2. Toujours en Julien, ouvrir l'URL `/praticien/patients/pa-karim` (patient suivi par une autre kiné) : **accès refusé et journalisé**.
-3. **Hugo Lambert (patient)** : il remplit et envoie son formulaire (la 1re étape est validée), déclare une douleur de 6/10, puis s'oppose au partage dans « Mes données ».
-4. **Dr Claire Morel** : Hugo apparaît dans « À surveiller ». Sa fiche affiche le bandeau d'opposition, et le journal montre toutes les actions précédentes.
+1. **Lucie Fontaine (coordination)** : la liste des actions à faire.
+   - Hugo n'a pas rempli son questionnaire (déjà relancé).
+   - Léa attend de valider une sophrologue.
+   - Ouvrir un parcours : aucune donnée clinique.
+2. **Chloé Bernard (patiente)** : son bilan est terminé ; elle choisit « Je continue » (parcours coordonné).
+3. **Lucie** : propose Camille Nguyen (podologue) et ajoute l'étape « Bilan podologique ».
+4. **Chloé** : accepte la podologue.
+5. **Lucie** : planifie le bilan podologique.
+6. **Camille Nguyen (podologue)** : voit maintenant Chloé.
+   - L'alimentation et le volet mental sont masqués ; le bilan du kiné est visible.
+   - Ouvrir `/praticien/patients/pa-hugo` (patient hors équipe) : accès refusé et tracé.
+7. **Julien Petit (kiné)** : rédige et remet le compte rendu de Sophie ; les étapes du bilan se valident. Ouvrir le PDF.
+8. **Marc Dubois (patient)** : son bilan est partagé avec sa kiné habituelle, et le journal montre l'ouverture du lien.
 
 ## Limites et suites
 
-- Authentification de démo (choix de profil). En production : Pro Santé Connect / e-CPS pour les praticiens, identifiant + double facteur pour les patients.
-- Base de démo réinitialisée à chaque démarrage à froid sur un hébergement serverless. En production : PostgreSQL chez un hébergeur certifié HDS, chiffrement au repos, sauvegardes.
-- Pistes : rappels de séance (email/SMS), messagerie sécurisée équipe ↔ patient, prise de rendez-vous en ligne, éditeur de parcours types, export du dossier (droit d'accès), politique de conservation alignée sur le statut juridique du centre.
+- **Authentification de démo :** à remplacer par Pro Santé Connect / e-CPS pour les praticiens et par un double facteur pour la coordination et les patients.
+- **Paiement non intégré :** l'offre à 150 € est seulement affichée ; pas de vrai rendez-vous en ligne non plus.
+- **Base de démo éphémère :** elle est recréée sur Vercel. En production : PostgreSQL chez un hébergeur HDS.
+- **Pistes :**
+  - rappels de séance par SMS ou email ;
+  - messagerie sécurisée ;
+  - agendas des praticiens ;
+  - téléconsultation intégrée ;
+  - indicateurs par parcours ;
+  - export du dossier.

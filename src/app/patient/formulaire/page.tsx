@@ -58,11 +58,11 @@ export default async function IntakePage({ searchParams }: PageProps<"/patient/f
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Mon formulaire préalable</h1>
+          <h1 className="text-2xl font-semibold">Mon questionnaire</h1>
           <p className="text-sm text-muted">
             {submitted
               ? `Envoyé le ${formatDate(intake!.submitted_at)}${intake!.updated_at !== intake!.submitted_at ? ` · mis à jour le ${formatDate(intake!.updated_at)}` : ""}`
-              : "Ces informations aident votre équipe à préparer votre accompagnement."}
+              : "5 minutes. Le kinésithérapeute le lit avant votre bilan de course, pour passer directement aux examens."}
           </p>
         </div>
         {submitted && !editing && (
@@ -101,8 +101,8 @@ export default async function IntakePage({ searchParams }: PageProps<"/patient/f
           ))}
           <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
             <p className="max-w-md text-xs text-muted">
-              Vos réponses sont couvertes par le secret médical. Chaque praticien de votre équipe ne voit que les sections
-              utiles à sa spécialité.{" "}
+              Vos réponses sont couvertes par le secret médical. Chaque praticien ne voit que les sections
+              utiles à sa spécialité ; la coordination ne voit que « Organisation ».{" "}
               <Link href="/patient/confidentialite" className="text-brand hover:underline">En savoir plus</Link>
             </p>
             <div className="flex gap-2">

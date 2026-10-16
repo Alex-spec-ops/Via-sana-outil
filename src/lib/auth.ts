@@ -15,7 +15,15 @@ const MAX_AGE_SECONDS = 60 * 60 * 8;
 
 export type Session =
   | { type: "practitioner"; id: string }
-  | { type: "patient"; id: string };
+  | { type: "patient"; id: string }
+  | { type: "coordinator"; id: string };
+
+export type CoordinatorUser = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+};
 
 export type PractitionerUser = {
   id: string;
@@ -23,6 +31,8 @@ export type PractitionerUser = {
   last_name: string;
   title: string;
   profession: Profession;
+  specialty: string;
+  location: string;
   email: string;
 };
 
@@ -63,7 +73,7 @@ export function decodeSession(token: string | undefined): Session | null {
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString());
     if (typeof data.exp !== "number" || data.exp < Date.now()) return null;
-    if ((data.type === "practitioner" || data.type === "patient") && typeof data.id === "string") {
+    if (["practitioner", "patient", "coordinator"].includes(data.type) && typeof data.id === "string") {
       return { type: data.type, id: data.id };
     }
   } catch {
@@ -97,6 +107,14 @@ export async function requirePractitioner(): Promise<PractitionerUser> {
   const session = await getSession();
   if (session?.type !== "practitioner") redirect("/");
   const user = get<PractitionerUser>("SELECT * FROM practitioners WHERE id = ?", session.id);
+  if (!user) redirect("/");
+  return user;
+}
+
+export async function requireCoordinator(): Promise<CoordinatorUser> {
+  const session = await getSession();
+  if (session?.type !== "coordinator") redirect("/");
+  const user = get<CoordinatorUser>("SELECT * FROM coordinators WHERE id = ?", session.id);
   if (!user) redirect("/");
   return user;
 }
