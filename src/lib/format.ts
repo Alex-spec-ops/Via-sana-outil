@@ -65,6 +65,7 @@ export const ACTION_LABEL: Record<string, string> = {
   relance: "a relancé le patient",
   changement_statut_parcours: "a changé le statut du parcours",
   connexion: "s'est connecté·e",
+  inscription: "a commencé son bilan",
   envoi_formulaire: "a envoyé le questionnaire",
   brouillon_formulaire: "a enregistré un brouillon du questionnaire",
   choix_parcours_coordonne: "a choisi le parcours coordonné",
@@ -79,6 +80,7 @@ export const ACTION_LABEL: Record<string, string> = {
 
 // The patient's own actions, as shown to them ("Vous …").
 export const SELF_ACTION_LABEL: Record<string, string> = {
+  inscription: "avez commencé votre bilan",
   connexion: "vous êtes connecté·e",
   envoi_formulaire: "avez envoyé le questionnaire",
   brouillon_formulaire: "avez enregistré un brouillon du questionnaire",

@@ -11,7 +11,7 @@ import { Card } from "@/components/ui";
 export default async function ReportPage({ params }: PageProps<"/compte-rendu/[id]">) {
   const { id } = await params;
   const session = await getSession();
-  if (!session) redirect("/");
+  if (!session) redirect("/connexion");
 
   let view;
   let back = "/";
@@ -20,7 +20,7 @@ export default async function ReportPage({ params }: PageProps<"/compte-rendu/[i
     back = "/patient";
   } else if (session.type === "practitioner") {
     const user = get<PractitionerUser>("SELECT * FROM practitioners WHERE id = ?", session.id);
-    if (!user) redirect("/");
+    if (!user) redirect("/connexion");
     view = getReportFor({ type: "practitioner", user }, id);
     back = view ? `/praticien/patients/${view.patient.id}` : "/praticien";
   } else {

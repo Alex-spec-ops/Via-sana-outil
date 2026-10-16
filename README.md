@@ -19,7 +19,11 @@ npm install
 npm run dev
 ```
 
-Ouvrir http://localhost:3000 et choisir un profil fictif. La base SQLite est créée et remplie automatiquement dans `data/via-sana.db`. Le bouton « Réinitialiser les données de démo » de la page d'accueil remet tout à zéro.
+Ouvrir http://localhost:3000 : la page d'accueil propose deux entrées.
+- « Commencer mon bilan » : inscription d'un nouveau client, qui arrive ensuite sur son questionnaire.
+- « Se connecter » : choix d'un profil fictif, sur `/connexion`.
+
+ La base SQLite est créée et remplie automatiquement dans `data/via-sana.db`. Le bouton « Réinitialiser les données de démo » de la page d'accueil remet tout à zéro.
 
 ## Trois rôles
 

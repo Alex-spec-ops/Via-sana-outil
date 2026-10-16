@@ -58,7 +58,57 @@ export async function loginAs(formData: FormData) {
     );
     redirect(sent ? "/patient" : "/patient/formulaire");
   }
-  redirect("/");
+  redirect("/connexion");
+}
+
+/**
+ * A new client starts their "bilan de course" from the landing page: the
+ * account, the enrolment and the bilan steps are created, the partner physio
+ * who runs the bilans is attached as referent, and the client lands on the
+ * questionnaire. (Demo: no password — production uses an email link + 2FA.)
+ */
+export async function startBilan(formData: FormData) {
+  const first = text(formData, "first_name", 60);
+  const last = text(formData, "last_name", 60);
+  const email = text(formData, "email", 120);
+  const phone = text(formData, "phone", 30);
+  const birth = text(formData, "birth_date", 10);
+  const goal = text(formData, "goal", 120) || "Préparer ma course";
+  const sex = ["F", "M", "X"].includes(text(formData, "sex")) ? text(formData, "sex") : "X";
+  if (!first || !last || !/^\S+@\S+\.\S+$/.test(email) || !/^\d{4}-\d{2}-\d{2}$/.test(birth) || text(formData, "consent") !== "1") {
+    redirect("/commencer?erreur=1");
+  }
+  const coordinator = get<{ id: string }>("SELECT id FROM coordinators ORDER BY id LIMIT 1");
+  const physio = get<{ id: string }>(
+    "SELECT id FROM practitioners WHERE profession = 'kine' ORDER BY CASE WHEN specialty LIKE '%bilans de course%' THEN 0 ELSE 1 END, last_name LIMIT 1",
+  );
+  if (!coordinator || !physio) redirect("/commencer?erreur=1");
+
+  const now = new Date().toISOString();
+  const patientId = `pa-${randomUUID()}`;
+  const enrollmentId = `en-${randomUUID()}`;
+  transaction(db, () => {
+    run(
+      "INSERT INTO patients (id, first_name, last_name, birth_date, sex, email, phone, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      patientId, first, last, birth, sex, email, phone, now,
+    );
+    run(
+      `INSERT INTO enrollments (id, patient_id, pathway_id, coordinator_id, offer, status, start_date, goal_title, goal_detail)
+       VALUES (?, ?, 'pw-prepa', ?, 'bilan', 'actif', ?, ?, '')`,
+      enrollmentId, patientId, coordinator!.id, now.slice(0, 10), goal,
+    );
+    // The partner physio who runs the bilans: the client accepts them by signing up for the bilan.
+    run(
+      "INSERT INTO care_team (enrollment_id, practitioner_id, status, is_referent, proposed_at, decided_at) VALUES (?, ?, 'acceptee', 1, ?, ?)",
+      enrollmentId, physio!.id, now, now,
+    );
+    instantiatePhase(db, enrollmentId, "bilan");
+    advance(db, enrollmentId);
+  });
+  await startSession({ type: "patient", id: patientId });
+  logAccess("patient", patientId, patientId, "inscription");
+  refresh();
+  redirect("/patient/formulaire");
 }
 
 export async function logout() {
@@ -71,7 +121,7 @@ export async function resetDemo() {
   resetDemoData();
   await endSession();
   refresh();
-  redirect("/");
+  redirect("/connexion");
 }
 
 // ------------------------------------------------------------- Practitioner

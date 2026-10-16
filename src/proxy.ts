@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // queries.ts) on every page and server action.
 export function proxy(request: NextRequest) {
   if (!request.cookies.has("vs_session")) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/connexion", request.url));
   }
   return NextResponse.next();
 }

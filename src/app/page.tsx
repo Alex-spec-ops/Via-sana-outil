@@ -1,115 +1,159 @@
-import { redirect } from "next/navigation";
-import { loginAs, resetDemo } from "./actions";
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import { listPersonas } from "@/lib/queries";
-import { PROFESSION_LABEL } from "@/lib/domain";
-import { fullName, initials } from "@/lib/format";
-import { EnrollmentStatusBadge, OfferBadge } from "@/components/ui";
+import { COORDINATION_OFFER } from "@/lib/domain";
 
 const HOME = { practitioner: "/praticien", patient: "/patient", coordinator: "/coordination" } as const;
 
-function PersonaButton({ type, id, children }: { type: string; id: string; children: React.ReactNode }) {
-  return (
-    <form action={loginAs}>
-      <input type="hidden" name="type" value={type} />
-      <input type="hidden" name="id" value={id} />
-      <button type="submit" className="card flex w-full items-center gap-3 p-3 text-left transition hover:border-brand">
-        {children}
-      </button>
-    </form>
-  );
-}
+const STEPS = [
+  {
+    n: "01",
+    title: "Vous répondez au questionnaire",
+    text: "Votre historique de course, votre objectif, vos éventuelles gênes. Le kinésithérapeute le lit avant de vous voir.",
+    meta: "5 minutes · en ligne",
+  },
+  {
+    n: "02",
+    title: "Le bilan de course",
+    text: "30 minutes avec un kinésithérapeute du sport : antécédents, volume, douleurs, appuis, bilan fonctionnel.",
+    meta: "30 minutes · au cabinet",
+  },
+  {
+    n: "03",
+    title: "Votre plan d'action",
+    text: "Les observations du kiné et des recommandations concrètes, dans un compte rendu PDF qui vous appartient.",
+    meta: "PDF · à garder",
+  },
+  {
+    n: "04",
+    title: "Un suivi coordonné, si vous le souhaitez",
+    text: "Une équipe composée selon les besoins de votre bilan, des rendez-vous organisés pour vous, un dossier unique.",
+    meta: `Optionnel · ${COORDINATION_OFFER.price} pour ${COORDINATION_OFFER.months} mois`,
+  },
+];
 
-export default async function Home() {
+const PRIVACY = [
+  { title: "Secret médical", text: "Chaque praticien ne voit que ce dont il a besoin pour vous soigner." },
+  { title: "Vous choisissez votre équipe", text: "Aucun praticien n'accède à votre dossier sans votre accord." },
+  { title: "Une coordination sans données de santé", text: "Votre coordinatrice organise, mais ne lit pas votre dossier médical." },
+  { title: "Tout est tracé", text: "Vous voyez qui a consulté votre dossier, et quand." },
+];
+
+export default async function Landing() {
   const session = await getSession();
-  if (session) redirect(HOME[session.type]);
-
-  const { coordinators, practitioners, patients } = listPersonas();
+  const space = session ? HOME[session.type] : null;
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10">
-      <div className="mb-8 flex items-center gap-3">
-        <span className="flex size-11 items-center justify-center rounded-xl bg-brand text-lg font-bold text-white">VS</span>
-        <div>
-          <h1 className="text-2xl font-semibold">Via Sana · PrépaMarathon</h1>
-          <p className="text-sm text-muted">Outil de coordination du parcours — prototype. Choisissez un profil fictif.</p>
+    <div className="flex flex-1 flex-col">
+      <header className="border-b border-border bg-surface">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-3">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">VS</span>
+            <span className="leading-tight">
+              <span className="block text-sm font-semibold">PrépaMarathon</span>
+              <span className="block text-xs text-muted">par Via Sana</span>
+            </span>
+          </Link>
+          <nav className="ml-auto flex items-center gap-2">
+            <a href="#comment" className="hidden rounded-md px-3 py-1.5 text-sm text-muted hover:text-foreground sm:block">Comment ça marche</a>
+            {space ? (
+              <Link href={space} className="btn btn-primary">Mon espace</Link>
+            ) : (
+              <Link href="/connexion" className="btn btn-secondary">Se connecter</Link>
+            )}
+          </nav>
         </div>
-      </div>
+        <p className="bg-brand-soft px-4 py-1 text-center text-xs text-brand">
+          Prototype de démonstration — n&apos;entrez pas de vraies données de santé.
+        </p>
+      </header>
 
-      <div className="mb-8 rounded-xl border border-brand/20 bg-brand-soft px-4 py-3 text-sm text-brand">
-        <strong>Mode démonstration.</strong> En production, l&apos;accès praticien passe par une authentification forte
-        (Pro Santé Connect / e-CPS), l&apos;accès coordination et patient par un identifiant personnel avec double facteur.
-        Les droits d&apos;accès affichés ensuite, eux, sont ceux de la version réelle.
-      </div>
+      <main className="flex-1">
+        <section className="bg-brand text-white">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 md:grid-cols-[1.3fr_1fr] md:py-24">
+            <div>
+              <p className="text-sm font-semibold tracking-widest text-white/70 uppercase">Le bilan de course · Paris</p>
+              <h1 className="mt-3 text-4xl leading-tight font-semibold md:text-5xl">
+                Préparez votre course,<br />entouré·e des bons praticiens.
+              </h1>
+              <p className="mt-5 max-w-xl text-lg text-white/85">
+                Un bilan de 30 minutes avec un kinésithérapeute du sport, un plan d&apos;action écrit pour vous, puis, si vous le
+                souhaitez, une équipe coordonnée jusqu&apos;à la ligne d&apos;arrivée.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <Link href={space === "/patient" ? "/patient" : "/commencer"} className="btn bg-white px-6 py-3 text-base text-brand hover:bg-brand-soft">
+                  Commencer mon bilan
+                </Link>
+                <Link href="/connexion" className="btn border border-white/40 px-6 py-3 text-base text-white hover:bg-white/10">
+                  J&apos;ai déjà un compte
+                </Link>
+              </div>
+              <p className="mt-3 text-sm text-white/70">5 minutes de questions · sans engagement</p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-6 ring-1 ring-white/20">
+              <p className="text-sm font-semibold tracking-wide text-white/70 uppercase">Le bilan examine</p>
+              <ul className="mt-3 space-y-2.5 text-white/90">
+                {["Vos antécédents de coureur", "Votre volume et votre programme", "Votre objectif et sa planification", "Vos douleurs et gênes", "Vos appuis et votre foulée", "Les déséquilibres à surveiller"].map((d) => (
+                  <li key={d} className="flex items-center gap-2.5">
+                    <span className="flex size-5 items-center justify-center rounded-full bg-white text-xs font-bold text-brand" aria-hidden>✓</span>
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <section>
-          <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Coordination Via Sana</h2>
-          <ul className="space-y-2">
-            {coordinators.map((c) => (
-              <li key={c.id}>
-                <PersonaButton type="coordinator" id={c.id}>
-                  <span className="flex size-10 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-white">{initials(c)}</span>
-                  <span className="flex-1">
-                    <span className="block font-medium">{c.first_name} {c.last_name}</span>
-                    <span className="block text-sm text-muted">Coordinatrice · organise, relance, suit</span>
-                  </span>
-                  <span className="text-xs text-muted">{c.patient_count} parcours</span>
-                </PersonaButton>
+        <section id="comment" className="mx-auto max-w-6xl scroll-mt-8 px-4 py-16">
+          <p className="text-sm font-semibold tracking-widest text-brand uppercase">Comment ça se passe</p>
+          <h2 className="mt-2 text-3xl font-semibold">Des étapes claires, zéro paperasse pour vous</h2>
+          <ol className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map((s) => (
+              <li key={s.n} className="card flex flex-col gap-3 p-5">
+                <span className="text-3xl font-semibold text-brand">{s.n}</span>
+                <h3 className="font-semibold">{s.title}</h3>
+                <p className="flex-1 text-sm text-muted">{s.text}</p>
+                <p className="text-xs font-semibold tracking-wide text-brand uppercase">{s.meta}</p>
               </li>
             ))}
-          </ul>
-          <p className="mt-3 text-xs text-muted">
-            Via Sana n&apos;est pas un établissement de santé : la coordination voit l&apos;organisation du parcours, jamais le contenu clinique.
+          </ol>
+          <p className="mt-6 text-sm text-muted">
+            Le bilan est une consultation de kinésithérapie réglée au praticien, remboursable selon votre situation. Vous pouvez vous
+            arrêter après le bilan : votre plan d&apos;action vous appartient.
           </p>
         </section>
 
-        <section>
-          <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Praticiens partenaires</h2>
-          <ul className="space-y-2">
-            {practitioners.map((p) => (
-              <li key={p.id}>
-                <PersonaButton type="practitioner" id={p.id}>
-                  <span className="flex size-10 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand">{initials(p)}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-medium">{fullName(p)}</span>
-                    <span className="block truncate text-sm text-muted">{PROFESSION_LABEL[p.profession]} · {p.specialty}</span>
-                  </span>
-                  <span className="text-xs text-muted">{p.patient_count}</span>
-                </PersonaButton>
-              </li>
-            ))}
-          </ul>
+        <section className="border-y border-border bg-surface">
+          <div className="mx-auto max-w-6xl px-4 py-16">
+            <p className="text-sm font-semibold tracking-widest text-brand uppercase">Vos données</p>
+            <h2 className="mt-2 text-3xl font-semibold">Votre dossier reste le vôtre</h2>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {PRIVACY.map((p) => (
+                <div key={p.title} className="rounded-xl bg-background p-5">
+                  <h3 className="font-semibold">{p.title}</h3>
+                  <p className="mt-1.5 text-sm text-muted">{p.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
 
-        <section>
-          <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Coureurs (patients)</h2>
-          <ul className="space-y-2">
-            {patients.map((p) => (
-              <li key={p.id}>
-                <PersonaButton type="patient" id={p.id}>
-                  <span className="flex size-10 items-center justify-center rounded-full bg-upcoming-soft text-sm font-semibold text-upcoming">{initials(p)}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-medium">{p.first_name} {p.last_name}</span>
-                    <span className="block truncate text-sm text-muted">{p.goal_title}</span>
-                  </span>
-                  <span className="flex flex-col items-end gap-1">
-                    <OfferBadge offer={p.offer} />
-                    {p.status !== "actif" && <EnrollmentStatusBadge status={p.status} />}
-                  </span>
-                </PersonaButton>
-              </li>
-            ))}
-          </ul>
+        <section className="mx-auto max-w-6xl px-4 py-16">
+          <div className="card flex flex-wrap items-center justify-between gap-6 p-8">
+            <div>
+              <h2 className="text-2xl font-semibold">Votre course a une date. Votre préparation commence ici.</h2>
+              <p className="mt-1 text-muted">Cinq minutes de questions sur votre course, votre objectif et votre historique.</p>
+            </div>
+            <Link href={space === "/patient" ? "/patient" : "/commencer"} className="btn btn-primary px-6 py-3 text-base">Commencer mon bilan</Link>
+          </div>
         </section>
-      </div>
+      </main>
 
-      <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-xs text-muted">
-        <p>Inspiré de l&apos;offre PrépaMarathon (prepamarathon.com). Toutes les personnes et données sont fictives.</p>
-        <form action={resetDemo}>
-          <button type="submit" className="btn btn-secondary text-xs">Réinitialiser les données de démo</button>
-        </form>
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted">
+          <p>Via Sana · prototype de l&apos;outil de coordination PrépaMarathon. Toutes les données sont fictives.</p>
+          <Link href="/connexion" className="hover:text-foreground">Espace praticiens et coordination →</Link>
+        </div>
       </footer>
-    </main>
+    </div>
   );
 }

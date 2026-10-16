@@ -105,24 +105,24 @@ export async function endSession() {
 
 export async function requirePractitioner(): Promise<PractitionerUser> {
   const session = await getSession();
-  if (session?.type !== "practitioner") redirect("/");
+  if (session?.type !== "practitioner") redirect("/connexion");
   const user = get<PractitionerUser>("SELECT * FROM practitioners WHERE id = ?", session.id);
-  if (!user) redirect("/");
+  if (!user) redirect("/connexion");
   return user;
 }
 
 export async function requireCoordinator(): Promise<CoordinatorUser> {
   const session = await getSession();
-  if (session?.type !== "coordinator") redirect("/");
+  if (session?.type !== "coordinator") redirect("/connexion");
   const user = get<CoordinatorUser>("SELECT * FROM coordinators WHERE id = ?", session.id);
-  if (!user) redirect("/");
+  if (!user) redirect("/connexion");
   return user;
 }
 
 export async function requirePatient(): Promise<PatientUser> {
   const session = await getSession();
-  if (session?.type !== "patient") redirect("/");
+  if (session?.type !== "patient") redirect("/connexion");
   const user = get<PatientUser>("SELECT id, first_name, last_name, email FROM patients WHERE id = ?", session.id);
-  if (!user) redirect("/");
+  if (!user) redirect("/connexion");
   return user;
 }
