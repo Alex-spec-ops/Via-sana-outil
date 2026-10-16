@@ -103,9 +103,16 @@ src/
 - SQLite via `node:sqlite` : démo autonome, schéma transposable à PostgreSQL.
 - Déploiement Vercel : la base de démo est recréée à chaque démarrage à froid.
 
-## Scénario de démonstration (≈ 6 min)
+## Scénario de démonstration (≈ 8 min)
 
+Avant de commencer : « Réinitialiser les données de démo » sur `/connexion`, puis retour à l'accueil.
+
+0. **Un nouveau coureur** : sur la page d'accueil, « Commencer mon bilan ».
+   - Inscription avec des informations fictives : on arrive directement sur le questionnaire.
+   - « Suivant » sans répondre : les questions obligatoires sont signalées.
+   - Répondre à la première page, puis « Enregistrer et finir plus tard ».
 1. **Lucie Fontaine (coordination)** : la liste des actions à faire.
+   - Le nouveau coureur apparaît avec « Questionnaire non envoyé ».
    - Hugo n'a pas rempli son questionnaire (déjà relancé).
    - Léa attend de valider une sophrologue.
    - Ouvrir un parcours : aucune donnée clinique.
@@ -116,7 +123,9 @@ src/
 6. **Camille Nguyen (podologue)** : voit maintenant Chloé.
    - L'alimentation et le volet mental sont masqués ; le bilan du kiné est visible.
    - Ouvrir `/praticien/patients/pa-hugo` (patient hors équipe) : accès refusé et tracé.
-7. **Julien Petit (kiné)** : rédige et remet le compte rendu de Sophie ; les étapes du bilan se valident. Ouvrir le PDF.
+7. **Julien Petit (kiné)** : ouvre Sophie.
+   - Point d'attention « douleur thoracique » ; la téléconsultation médicale est maintenue.
+   - Il rédige et remet le compte rendu ; les étapes du bilan se valident. Ouvrir le PDF.
 8. **Marc Dubois (patient)** : son bilan est partagé avec sa kiné habituelle, et le journal montre l'ouverture du lien.
 
 ## Limites et suites
