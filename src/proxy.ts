@@ -1,11 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 // Optimistic check only: bounce visitors without a session cookie to the
-// profile picker. The real authorisation happens server side (auth.ts /
+// right login page. The real authorisation happens server side (auth.ts /
 // queries.ts) on every page and server action.
 export function proxy(request: NextRequest) {
   if (!request.cookies.has("vs_session")) {
-    return NextResponse.redirect(new URL("/connexion", request.url));
+    // Straight to the login page of the space being visited.
+    const space = request.nextUrl.pathname.split("/")[1];
+    const login = space === "praticien" || space === "patient" || space === "coordination" ? `/connexion/${space}` : "/connexion";
+    return NextResponse.redirect(new URL(login, request.url));
   }
   return NextResponse.next();
 }

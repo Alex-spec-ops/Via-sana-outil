@@ -28,7 +28,7 @@ export default async function StartPage() {
       <SignupForm />
 
       <p className="mt-6 text-center text-sm text-muted">
-        Déjà inscrit·e ? <Link href="/connexion" className="text-brand hover:underline">Se connecter</Link>
+        Déjà inscrit·e ? <Link href="/connexion/patient" className="text-brand hover:underline">Se connecter</Link>
       </p>
     </main>
   );

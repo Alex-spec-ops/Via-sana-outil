@@ -4,13 +4,14 @@ import { useActionState, useRef, useState } from "react";
 import { loginWithPassword, type LoginState } from "@/app/actions";
 import { SubmitButton } from "@/components/submit-button";
 import { Notice } from "@/components/ui";
+import type { SpaceSlug } from "@/lib/spaces";
 
 export type DemoAccount = { email: string; name: string; detail: string; initials: string; tone: string };
-export type DemoGroup = { title: string; accounts: DemoAccount[] };
 
 const PASSWORD_MAX_LENGTH = 128;
 
-export function LoginForm({ groups, demoPassword }: { groups: DemoGroup[]; demoPassword: string }) {
+/** Email + password login of one space; the demo accounts listed are that space's only. */
+export function LoginForm({ space, accounts, demoPassword }: { space: SpaceSlug; accounts: DemoAccount[]; demoPassword: string }) {
   const [state, action] = useActionState<LoginState, FormData>(loginWithPassword, { error: null });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,6 +29,7 @@ export function LoginForm({ groups, demoPassword }: { groups: DemoGroup[]; demoP
       <form action={action} className="card h-fit space-y-4 p-6">
         <h2 className="text-lg font-semibold">Se connecter</h2>
         {state.error && <Notice tone="danger">{state.error}</Notice>}
+        <input type="hidden" name="space" value={space} />
         <div>
           <label className="label" htmlFor="email">Email</label>
           <input
@@ -59,29 +61,22 @@ export function LoginForm({ groups, demoPassword }: { groups: DemoGroup[]; demoP
           <strong>Comptes de démonstration.</strong> Cliquez sur un profil fictif pour remplir le formulaire, puis
           « Se connecter ». Mot de passe commun : <code className="rounded bg-white/70 px-1 font-semibold">{demoPassword}</code>
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
-          {groups.map((group) => (
-            <div key={group.title}>
-              <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">{group.title}</h3>
-              <ul className="space-y-2">
-                {group.accounts.map((a) => (
-                  <li key={a.email}>
-                    <button
-                      type="button" onClick={() => fill(a)}
-                      className={`card flex w-full items-center gap-3 p-2.5 text-left transition hover:border-brand ${email === a.email ? "border-brand" : ""}`}
-                    >
-                      <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${a.tone}`}>{a.initials}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{a.name}</span>
-                        <span className="block truncate text-xs text-muted">{a.detail}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {accounts.map((a) => (
+            <li key={a.email}>
+              <button
+                type="button" onClick={() => fill(a)}
+                className={`card flex w-full items-center gap-3 p-2.5 text-left transition hover:border-brand ${email === a.email ? "border-brand" : ""}`}
+              >
+                <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${a.tone}`}>{a.initials}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{a.name}</span>
+                  <span className="block truncate text-xs text-muted">{a.detail}</span>
+                </span>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
     </div>
   );

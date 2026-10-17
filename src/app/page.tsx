@@ -82,7 +82,7 @@ export default async function Landing() {
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Link href={start} className="btn btn-primary px-8 py-4 text-base">Commencer mon bilan</Link>
-            <Link href="/connexion" className="btn btn-secondary px-8 py-4 text-base">J&apos;ai déjà un compte</Link>
+            <Link href="/connexion/patient" className="btn btn-secondary px-8 py-4 text-base">J&apos;ai déjà un compte</Link>
           </div>
           <p className="mt-4 text-sm text-muted">5 minutes de questions · sans engagement</p>
         </section>

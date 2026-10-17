@@ -30,7 +30,12 @@ npm run dev
 
 Ouvrir http://localhost:3000 : la page d'accueil propose deux entrées.
 - « Commencer mon bilan » : inscription d'un nouveau client, qui arrive ensuite sur son questionnaire.
-- « Se connecter » : email et mot de passe, sur `/connexion`. Les comptes fictifs y sont listés (un clic remplit le formulaire), avec le mot de passe de démonstration commun `Demo-ViaSana-2026`.
+- « Se connecter » : `/connexion` propose trois espaces, chacun avec sa page de connexion (email et mot de passe) :
+  - `/connexion/patient` pour les coureurs ;
+  - `/connexion/praticien` pour les praticiens partenaires ;
+  - `/connexion/coordination` pour l'équipe Via Sana.
+
+  Chaque page n'accepte que les comptes de son espace : un compte d'un autre espace reçoit le même message d'erreur qu'un mot de passe faux, sans révéler qu'il existe. Chaque page liste ses comptes fictifs (un clic remplit le formulaire), avec le mot de passe de démonstration commun `Demo-ViaSana-2026`.
 
 Les données fictives sont créées automatiquement au premier lancement. Le bouton « Réinitialiser les données de démo » (page `/connexion`) remet tout à zéro.
 
@@ -94,7 +99,7 @@ src/
   app/
     actions.ts                         Server Actions, avec contrôle d'accès par rôle
     page.tsx                           Page d'accueil (commencer son bilan ou se connecter)
-    connexion/, commencer/             Connexion email + mot de passe, inscription
+    connexion/, commencer/             Choix de l'espace, connexion par espace ([espace]), inscription
     coordination/                      File « À traiter », liste des parcours, vue logistique d'un parcours
     praticien/                         File « À traiter », liste, fiche patient (« À retenir », compte rendu, notes, suivi)
     patient/                           Tableau de bord, questionnaire, « Mes données », export agenda (.ics)
@@ -126,7 +131,7 @@ src/
 
 **Compte du jury** : `jury.demo@exemple.fr`, avec le mot de passe de démonstration commun. C'est un coureur qui vient de s'inscrire : à la connexion, il arrive sur son questionnaire. Le compte fait partie des données de démo, donc la réinitialisation le recrée à l'identique. Une vidéo de 2 minutes, sans voix off, montre sa création (inscription, mot de passe refusé puis accepté, questionnaire, reconnexion).
 
-Avant de commencer : « Réinitialiser les données de démo » sur `/connexion` (environ 30 secondes), puis retour à l'accueil. Pour changer de profil : « Se déconnecter », puis un clic sur le compte fictif remplit le formulaire de connexion.
+Avant de commencer : « Réinitialiser les données de démo » sur `/connexion` (environ 30 secondes), puis retour à l'accueil. Pour changer de profil : « Se déconnecter », « Se connecter », choisir l'espace, puis un clic sur le compte fictif remplit le formulaire.
 
 0. **Un nouveau coureur** : sur la page d'accueil, « Commencer mon bilan ».
    - Inscription avec des informations fictives et un mot de passe : un mot de passe trop faible est refusé, puis on arrive directement sur le questionnaire.

@@ -8,6 +8,7 @@ import { get, resetDemoData, run, transaction } from "@/lib/db";
 import { BILAN_DIMENSIONS, COORDINATION_OFFER, INTAKE_SECTIONS, needsMedicalOpinion, type IntakeAnswers } from "@/lib/domain";
 import { addCatalogStep, advance, completeStep, instantiatePhase, skipStep } from "@/lib/pathway";
 import { isInCareTeam, logAccess } from "@/lib/queries";
+import { SPACES, isSpace } from "@/lib/spaces";
 import { PASSWORD_MAX_LENGTH, dummyPasswordHash, hashPassword, passwordProblem, verifyPassword } from "@/lib/passwords";
 
 function text(formData: FormData, key: string, max = 2000) {
@@ -73,8 +74,12 @@ export async function loginWithPassword(_prev: LoginState, formData: FormData): 
   const password = typeof raw === "string" ? raw.slice(0, PASSWORD_MAX_LENGTH) : "";
   if (!email || !password) return { error: LOGIN_ERROR };
 
+  // Each login page only accepts its own kind of account. A wrong space is
+  // answered exactly like an unknown email: same message, same work.
+  const space = text(formData, "space", 20);
+  const expected = isSpace(space) ? SPACES[space].userType : null;
   const credential = await get<CredentialRow>("SELECT * FROM credentials WHERE email = ?", email);
-  if (!credential) {
+  if (!credential || credential.user_type !== expected) {
     await verifyPassword(password, await dummyPasswordHash());
     return { error: LOGIN_ERROR };
   }

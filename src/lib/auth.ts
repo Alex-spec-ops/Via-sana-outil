@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { get } from "./db";
 import type { Profession } from "./domain";
+import { LOGIN } from "./spaces";
 
 // Authentication: email + password (see passwords.ts and loginWithPassword in
 // actions.ts), then an HMAC-signed, httpOnly session cookie. In production a
@@ -110,24 +111,24 @@ export async function endSession() {
 
 export async function requirePractitioner(): Promise<PractitionerUser> {
   const session = await getSession();
-  if (session?.type !== "practitioner") redirect("/connexion");
+  if (session?.type !== "practitioner") redirect(LOGIN.practitioner);
   const user = await get<PractitionerUser>("SELECT * FROM practitioners WHERE id = ?", session.id);
-  if (!user) redirect("/connexion");
+  if (!user) redirect(LOGIN.practitioner);
   return user;
 }
 
 export async function requireCoordinator(): Promise<CoordinatorUser> {
   const session = await getSession();
-  if (session?.type !== "coordinator") redirect("/connexion");
+  if (session?.type !== "coordinator") redirect(LOGIN.coordinator);
   const user = await get<CoordinatorUser>("SELECT * FROM coordinators WHERE id = ?", session.id);
-  if (!user) redirect("/connexion");
+  if (!user) redirect(LOGIN.coordinator);
   return user;
 }
 
 export async function requirePatient(): Promise<PatientUser> {
   const session = await getSession();
-  if (session?.type !== "patient") redirect("/connexion");
+  if (session?.type !== "patient") redirect(LOGIN.patient);
   const user = await get<PatientUser>("SELECT id, first_name, last_name, email FROM patients WHERE id = ?", session.id);
-  if (!user) redirect("/connexion");
+  if (!user) redirect(LOGIN.patient);
   return user;
 }
