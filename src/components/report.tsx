@@ -1,6 +1,7 @@
 import { BILAN_DIMENSIONS, PROFESSION_LABEL } from "@/lib/domain";
 import { age, formatDate } from "@/lib/format";
 import type { EnrollmentRow, PatientRow, ReportRow } from "@/lib/queries";
+import { Wordmark } from "@/components/wordmark";
 
 /** The "bilan de course" report, laid out to read on screen and print to PDF. */
 export function ReportDocument({ report, patient, enrollment }: { report: ReportRow; patient: PatientRow; enrollment: EnrollmentRow }) {
@@ -9,10 +10,9 @@ export function ReportDocument({ report, patient, enrollment }: { report: Report
     <article className="card mx-auto max-w-3xl p-8 print:max-w-none print:border-0 print:p-0">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">VS</span>
           <div>
-            <p className="text-xs font-semibold tracking-wide text-brand uppercase">{enrollment.pathway_name} · Via Sana</p>
-            <h1 className="text-2xl font-semibold">{report.title}</h1>
+            <Wordmark />
+            <h1 className="mt-5 text-3xl">{report.title}</h1>
           </div>
         </div>
         <div className="text-right text-sm">

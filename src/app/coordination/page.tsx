@@ -46,7 +46,7 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Bonjour {me.first_name}</h1>
+        <h1 className="text-3xl">Bonjour <span className="accent-serif">{me.first_name}</span></h1>
         <p className="text-sm text-muted">
           Vous organisez les parcours : questionnaires, rendez-vous, composition des équipes, relances. Le contenu clinique reste entre
           le patient et ses praticiens.
@@ -56,17 +56,19 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
       <WorkQueue items={queue} emptyText="Tout est à jour : aucune relance ni séance à organiser." />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {stats.map((s) => {
+        {stats.map((s, i) => {
+          // Coloured key figures, as on prepamarathon.com.
+          const tone = ["bg-accent text-ecru", "bg-brand text-ecru", "bg-azurin text-brand", "bg-surface text-foreground border border-border"][i % 4];
           const content = (
             <>
-              <p className="text-2xl font-semibold tabular-nums">{s.value}</p>
-              <p className="text-sm text-muted">{s.label}</p>
+              <p className="font-display text-4xl font-bold tabular-nums">{s.value}</p>
+              <p className="mt-1 text-sm opacity-85">{s.label}</p>
             </>
           );
           return s.href ? (
-            <Link key={s.label} href={s.href} className="card p-4 transition hover:border-brand">{content}</Link>
+            <Link key={s.label} href={s.href} className={`rounded-[20px] px-5 py-4 transition hover:-translate-y-0.5 ${tone}`}>{content}</Link>
           ) : (
-            <div key={s.label} className="card p-4">{content}</div>
+            <div key={s.label} className={`rounded-[20px] px-5 py-4 ${tone}`}>{content}</div>
           );
         })}
       </div>

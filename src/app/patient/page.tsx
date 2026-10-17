@@ -48,11 +48,12 @@ export default async function PatientHome({ searchParams }: PageProps<"/patient"
 
       <section className="card overflow-hidden">
         <div className="bg-brand px-5 py-5 text-white">
-          <p className="text-sm opacity-80">PrépaMarathon · {enrollment.offer === "parcours" ? "Parcours coordonné" : "Bilan de course"}</p>
-          <h1 className="text-2xl font-semibold">{enrollment.goal_title}</h1>
+          <span className="eyebrow">{enrollment.offer === "parcours" ? "Parcours coordonné" : "Bilan de course"}</span>
+          <h1 className="mt-3 text-3xl">{enrollment.goal_title}</h1>
           {enrollment.goal_date && raceIn !== null && raceIn >= 0 ? (
             <p className="mt-1 text-sm opacity-90">
-              <span className="font-semibold">J-{raceIn}</span> · rendez-vous le {formatDate(enrollment.goal_date, { day: "numeric", month: "long" })}
+              <span className="accent-serif text-lg text-[#f6a588]">Plus que {raceIn} jours.</span>{" "}
+              <span className="opacity-90">Rendez-vous le {formatDate(enrollment.goal_date, { day: "numeric", month: "long" })}</span>
             </p>
           ) : (
             enrollment.goal_detail && <p className="mt-1 text-sm opacity-90">{enrollment.goal_detail}</p>
@@ -210,7 +211,7 @@ export default async function PatientHome({ searchParams }: PageProps<"/patient"
           </Card>
 
           {enrollment.offer === "parcours" && (
-            <section id="suivi" className="scroll-mt-28">
+            <section id="suivi" className="scroll-mt-[calc(var(--header-h,90px)+1rem)]">
               <Card title="Mon suivi de la semaine">
                 {suivi === "envoye" && (
                   <div className="mb-4">

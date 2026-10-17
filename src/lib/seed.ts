@@ -10,16 +10,24 @@ import { DEMO_PASSWORD, hashPassword } from "./passwords";
 
 const DAY = 24 * 60 * 60 * 1000;
 
+/** Hours Paris is ahead of UTC on that date (1 in winter, 2 in summer). */
+function parisOffset(d: Date) {
+  const inZone = (timeZone: string) => new Date(d.toLocaleString("en-US", { timeZone }));
+  return Math.round((inZone("Europe/Paris").getTime() - inZone("UTC").getTime()) / 3_600_000);
+}
+
+/** `days` from `base`, at `hour:minute` Paris time — whatever the server's time zone (Vercel runs in UTC). */
 function at(base: number, days: number, hour = 10, minute = 0) {
   const d = new Date(base + days * DAY);
-  d.setHours(hour, minute, 0, 0);
+  d.setUTCHours(hour, minute, 0, 0);
+  d.setUTCHours(hour - parisOffset(d), minute, 0, 0);
   return d.toISOString();
 }
 
 /** Same as `at`, moved to the next Monday when it falls on a weekend (appointments). */
 function weekdayAt(base: number, days: number, hour = 10, minute = 0) {
   const d = new Date(at(base, days, hour, minute));
-  const shift = d.getDay() === 6 ? 2 : d.getDay() === 0 ? 1 : 0;
+  const shift = d.getUTCDay() === 6 ? 2 : d.getUTCDay() === 0 ? 1 : 0;
   return shift ? at(base, days + shift, hour, minute) : d.toISOString();
 }
 

@@ -83,7 +83,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section id={id} className={`card p-5 ${id ? "scroll-mt-48 sm:scroll-mt-36" : ""} ${className}`}>
+    <section id={id} className={`card p-5 ${id ? "scroll-mt-[calc(var(--header-h,90px)+3.5rem)]" : ""} ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           {title && <h2 className="text-base font-semibold">{title}</h2>}

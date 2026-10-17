@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { logout } from "@/app/actions";
 import { AppNav } from "./app-nav";
+import { Wordmark } from "./wordmark";
 
 export function AppHeader({
   home,
@@ -16,14 +17,10 @@ export function AppHeader({
   nav: { href: string; label: string }[];
 }) {
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur print:hidden">
+    <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur print:hidden">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 sm:py-3">
         <Link href={home} className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">VS</span>
-          <span className="leading-tight">
-            <span className="block text-sm font-semibold">Via Sana</span>
-            <span className="block text-xs text-muted">{space}</span>
-          </span>
+          <Wordmark sub={`Via Sana · ${space}`} />
         </Link>
         {/* On a phone the links move to their own scrollable row, under the logo and the account. */}
         <div className="order-last w-full sm:order-none sm:w-auto">

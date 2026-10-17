@@ -8,6 +8,7 @@ import { fullName, initials } from "@/lib/format";
 import { DEMO_PASSWORD } from "@/lib/passwords";
 import { LoginForm, type DemoGroup } from "@/components/login-form";
 import { SubmitButton } from "@/components/submit-button";
+import { Wordmark } from "@/components/wordmark";
 
 const HOME = { practitioner: "/praticien", patient: "/patient", coordinator: "/coordination" } as const;
 
@@ -48,10 +49,10 @@ export default async function ConnexionPage() {
           Nouveau client ? <Link href="/commencer" className="font-medium text-brand hover:underline">Commencer mon bilan</Link>
         </p>
       </div>
-      <div className="mb-8 flex items-center gap-3">
-        <span className="flex size-11 items-center justify-center rounded-xl bg-brand text-lg font-bold text-white">VS</span>
+      <div className="mb-8 space-y-3">
+        <Wordmark size="lg" />
         <div>
-          <h1 className="text-2xl font-semibold">Via Sana · PrépaMarathon</h1>
+          <h1 className="text-3xl">Bon retour <span className="accent-serif">parmi nous</span></h1>
           <p className="text-sm text-muted">Outil de coordination du parcours — connectez-vous avec votre email et votre mot de passe.</p>
         </div>
       </div>
