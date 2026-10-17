@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { requireCoordinator } from "@/lib/auth";
 import { ENROLLMENT_STATUS_LABEL, OFFER_LABEL, PROFESSION_LABEL } from "@/lib/domain";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { coordinationTodos, listForCoordinator, upcomingSessionsForCoordinator } from "@/lib/queries";
 import { Badge, Card, EmptyState, EnrollmentStatusBadge, OfferBadge, ProgressBar } from "@/components/ui";
+import { AgendaList } from "@/components/agenda-list";
+import { FilterForm } from "@/components/filter-form";
+import { WorkQueue, type QueueItem } from "@/components/work-queue";
 
 export default async function CoordinationPage({ searchParams }: PageProps<"/coordination">) {
   const me = await requireCoordinator();
@@ -16,6 +19,22 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
   const upcoming = await upcomingSessionsForCoordinator(me.id);
   const stepTitles = [...new Set(everyone.map((r) => r.current_step_title).filter(Boolean))] as string[];
   const activeFilters = Object.values(filters).some(Boolean);
+
+  // The coordinator's work queue: overdue questionnaires first, then by number of things to do.
+  const queue: QueueItem[] = everyone
+    .map((r) => {
+      const todos = coordinationTodos(r);
+      const late = todos.some((t) => t.startsWith("Questionnaire") && !r.last_relance_at);
+      return {
+        key: r.enrollment_id,
+        href: `/coordination/patients/${r.patient_id}${todos.some((t) => t.startsWith("Questionnaire") || t.startsWith("Choix")) ? "#relances" : "#parcours"}`,
+        who: `${r.first_name} ${r.last_name}`,
+        detail: r.last_relance_at ? `Relancé le ${formatDate(r.last_relance_at, { day: "numeric", month: "short" })}` : r.goal_title,
+        tasks: todos.map((t) => ({ label: t, tone: (t.startsWith("Questionnaire") && late ? "danger" : "ongoing") as "danger" | "ongoing" })),
+      };
+    })
+    .filter((item) => item.tasks.length > 0)
+    .sort((a, b) => Number(b.tasks.some((t) => t.tone === "danger")) - Number(a.tasks.some((t) => t.tone === "danger")) || b.tasks.length - a.tasks.length);
 
   const stats = [
     { label: "Bilans de course en cours", value: everyone.filter((r) => r.offer === "bilan" && r.status === "actif").length, href: "/coordination?offre=bilan&statut=actif" },
@@ -33,6 +52,8 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
           le patient et ses praticiens.
         </p>
       </div>
+
+      <WorkQueue items={queue} emptyText="Tout est à jour : aucune relance ni séance à organiser." />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {stats.map((s) => {
@@ -52,7 +73,7 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
         <Card className="min-w-0">
-          <form className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1.3fr_auto]" method="get">
+          <FilterForm className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1.3fr_auto]">
             <input name="q" defaultValue={filters.q} placeholder="Rechercher…" className="input" aria-label="Rechercher" />
             <select name="offre" defaultValue={filters.offer ?? ""} className="input" aria-label="Offre">
               <option value="">Toutes les offres</option>
@@ -67,10 +88,10 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
               {stepTitles.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
             <div className="flex gap-2">
-              <button className="btn btn-primary" type="submit">Filtrer</button>
+              <button className="btn btn-primary" type="submit">Rechercher</button>
               {activeFilters && <Link href="/coordination" className="btn btn-secondary">Effacer</Link>}
             </div>
-          </form>
+          </FilterForm>
 
           {rows.length === 0 ? (
             <EmptyState>Aucun parcours ne correspond à ces filtres.</EmptyState>
@@ -91,9 +112,9 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
                   {rows.map((r) => {
                     const todos = coordinationTodos(r);
                     return (
-                      <tr key={r.enrollment_id} className="border-b border-border align-top last:border-0 hover:bg-background">
+                      <tr key={r.enrollment_id} className="relative border-b border-border align-top last:border-0 hover:bg-background">
                         <td className="px-5 py-3">
-                          <Link href={`/coordination/patients/${r.patient_id}`} className="font-medium text-brand hover:underline">
+                          <Link href={`/coordination/patients/${r.patient_id}`} className="font-medium text-brand after:absolute after:inset-0 hover:underline">
                             {r.first_name} {r.last_name}
                           </Link>
                           <p className="text-xs text-muted">{r.goal_title}</p>
@@ -132,21 +153,12 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
         </Card>
 
         <Card title="Agenda du réseau">
-          {upcoming.length === 0 ? (
-            <EmptyState>Aucune séance planifiée.</EmptyState>
-          ) : (
-            <ul className="space-y-3">
-              {upcoming.map((s) => (
-                <li key={s.id} className="border-l-2 border-brand pl-3">
-                  <p className="text-sm font-medium first-letter:uppercase">{formatDateTime(s.starts_at)}</p>
-                  <Link href={`/coordination/patients/${s.patient_id}`} className="text-sm text-brand hover:underline">
-                    {s.first_name} {s.last_name}
-                  </Link>
-                  <p className="text-xs text-muted">{s.step_title ?? "Séance"} · {s.practitioner_name}</p>
-                </li>
-              ))}
-            </ul>
-          )}
+          <AgendaList
+            items={upcoming.map((s) => ({
+              id: s.id, starts_at: s.starts_at, duration_min: s.duration_min, href: `/coordination/patients/${s.patient_id}`,
+              who: `${s.first_name} ${s.last_name}`, what: `${s.step_title ?? "Séance"} · ${s.practitioner_name}`,
+            }))}
+          />
         </Card>
       </div>
     </div>

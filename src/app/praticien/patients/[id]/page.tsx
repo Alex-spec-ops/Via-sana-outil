@@ -9,6 +9,7 @@ import { Timeline } from "@/components/timeline";
 import { IntakeView } from "@/components/intake-view";
 import { CheckinTable } from "@/components/checkins";
 import { SubmitButton } from "@/components/submit-button";
+import { SectionNav } from "@/components/section-nav";
 
 const VISIBILITY_TONE = {
   equipe: "bg-brand-soft text-brand",
@@ -80,6 +81,9 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
   // Warning signs, limited to the sections this practitioner is allowed to read.
   const visibleSections = new Set(file.intakeSections.map((s) => s.id));
   const redFlags = intake?.submitted_at ? intakeRedFlags(intake.answers).filter((f) => visibleSections.has(f.section)) : [];
+  const lastCheckin = checkins[0];
+  const next = upcoming[0];
+  const reportDue = canWriteReport && editable && !reports.some((r) => r.published_at) && bilanStep?.status === "realisee";
 
   const stepActions = (step: TimelineStep) => {
     if (!editable || step.status === "realisee" || step.status === "non_retenue") return null;
@@ -109,7 +113,9 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
           <EnrollmentStatusBadge status={enrollment.status} />
         </div>
         <p className="mt-1 text-sm text-muted">
-          {age(patient.birth_date)} ans · né{patient.sex === "F" ? "e" : ""} le {formatDate(patient.birth_date)} · {patient.phone} · {patient.email}
+          {age(patient.birth_date)} ans · né{patient.sex === "F" ? "e" : ""} le {formatDate(patient.birth_date)} ·{" "}
+          <a href={`tel:${patient.phone.replace(/s/g, "")}`} className="text-brand hover:underline">{patient.phone}</a> ·{" "}
+          <a href={`mailto:${patient.email}`} className="text-brand hover:underline">{patient.email}</a>
         </p>
         <div className="mt-5 grid gap-4 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
@@ -142,6 +148,71 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
         </div>
       </section>
 
+      <section aria-label="À retenir" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <a href="#questionnaire" className={`card p-4 transition hover:border-brand ${redFlags.length ? "border-danger/40 bg-danger-soft" : ""}`}>
+          <p className="label">Questionnaire</p>
+          {!intake?.submitted_at ? (
+            <p className="text-sm text-muted">Pas encore envoyé</p>
+          ) : redFlags.length ? (
+            <>
+              <p className="text-sm font-semibold text-danger">{redFlags.length} point{redFlags.length > 1 ? "s" : ""} d&apos;attention</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-danger">{redFlags.map((f) => f.label).join(" · ")}</p>
+            </>
+          ) : (
+            <p className="text-sm text-done">Aucun signal d&apos;alerte</p>
+          )}
+        </a>
+        <a href="#suivi" className={`card p-4 transition hover:border-brand ${lastCheckin?.pain != null && lastCheckin.pain >= 5 ? "border-danger/40 bg-danger-soft" : ""}`}>
+          <p className="label">Dernier suivi</p>
+          {lastCheckin ? (
+            <>
+              <p className="text-sm">
+                Douleur <span className={lastCheckin.pain != null && lastCheckin.pain >= 5 ? "font-semibold text-danger" : "font-medium"}>{lastCheckin.pain ?? "—"}/10</span>
+                {" · "}Fatigue <span className="font-medium">{lastCheckin.fatigue ?? "—"}/10</span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                {lastCheckin.weekly_km != null && `${lastCheckin.weekly_km} km · `}le {formatDate(lastCheckin.date, { day: "numeric", month: "short" })}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted">{enrollment.offer === "parcours" ? "Aucun suivi déclaré" : "Bilan seul : pas de suivi"}</p>
+          )}
+        </a>
+        <a href="#seances" className="card p-4 transition hover:border-brand">
+          <p className="label">Prochaine séance</p>
+          {next ? (
+            <>
+              <p className="text-sm font-medium first-letter:uppercase">{formatDateTime(next.starts_at)}</p>
+              <p className="mt-0.5 truncate text-xs text-muted">{next.step_title ?? "Séance de suivi"} · {next.practitioner_id === me.id ? "avec vous" : next.practitioner_name}</p>
+            </>
+          ) : (
+            <p className="text-sm text-muted">Aucune séance planifiée</p>
+          )}
+        </a>
+        <a href="#compte-rendu" className={`card p-4 transition hover:border-brand ${reportDue ? "border-ongoing/40 bg-ongoing-soft" : ""}`}>
+          <p className="label">Compte rendu</p>
+          {reports.some((r) => r.published_at) ? (
+            <p className="text-sm text-done">Remis au patient</p>
+          ) : reportDue ? (
+            <p className="text-sm font-semibold text-ongoing">À rédiger et remettre</p>
+          ) : (
+            <p className="text-sm text-muted">{reports.length ? "Brouillon en cours" : "Après le bilan de course"}</p>
+          )}
+        </a>
+      </section>
+
+      <SectionNav
+        items={[
+          { id: "parcours", label: "Parcours" },
+          { id: "compte-rendu", label: "Compte rendu" },
+          { id: "notes", label: "Notes" },
+          ...(enrollment.offer === "parcours" ? [{ id: "suivi", label: "Suivi" }] : []),
+          { id: "questionnaire", label: "Questionnaire" },
+          { id: "seances", label: "Séances" },
+          { id: "equipe", label: "Équipe" },
+        ]}
+      />
+
       {enrollment.sharing_opposed === 1 && (
         <Notice tone="current">
           <strong>Le patient s&apos;est opposé au partage d&apos;informations entre praticiens</strong>
@@ -153,11 +224,11 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
-          <Card title="Parcours" action={<span className="text-xs text-muted">{done} étape{done > 1 ? "s" : ""} réalisée{done > 1 ? "s" : ""} sur {total}</span>}>
-            <Timeline steps={timeline} startDate={enrollment.start_date} showSummaries actions={stepActions} />
+          <Card id="parcours" title="Parcours" action={<span className="text-xs text-muted">{done} étape{done > 1 ? "s" : ""} réalisée{done > 1 ? "s" : ""} sur {total}</span>}>
+            <Timeline steps={timeline} startDate={enrollment.start_date} showSummaries actions={stepActions} collapseFinished />
           </Card>
 
-          <Card title="Compte rendu du bilan de course">
+          <Card id="compte-rendu" title="Compte rendu du bilan de course">
             {reports.length === 0 && !canWriteReport && <EmptyState>Pas encore de compte rendu.</EmptyState>}
             {reports.map((r) => (
               <div key={r.id} className="mb-4 rounded-lg border border-border p-4">
@@ -189,10 +260,11 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
             )}
           </Card>
 
-          <Card title="Notes de suivi">
+          <Card id="notes" title="Notes de suivi">
             <form action={addNote} className="mb-5 space-y-2">
               <input type="hidden" name="enrollmentId" value={enrollment.id} />
               <textarea name="body" required rows={3} className="input" placeholder="Observation, conseil, point de coordination…" aria-label="Nouvelle note" />
+              <p className="text-xs text-muted">Visible par : l&apos;équipe de soins, vous seul·e, ou le patient (il la verra dans « Conseils de mon équipe »).</p>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <fieldset className="flex flex-wrap gap-3 text-sm">
                   <legend className="sr-only">Visibilité</legend>
@@ -226,12 +298,13 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
           </Card>
 
           {enrollment.offer === "parcours" && (
-            <Card title="Suivi hebdomadaire déclaré par le patient">
+            <Card id="suivi" title="Suivi hebdomadaire déclaré par le patient">
               <CheckinTable checkins={checkins} />
             </Card>
           )}
 
           <Card
+            id="questionnaire"
             title="Questionnaire"
             action={intake?.submitted_at ? <span className="text-xs text-muted">Envoyé le {formatDate(intake.submitted_at)}</span> : <Badge className="bg-danger-soft text-danger">Non envoyé</Badge>}
           >
@@ -263,7 +336,7 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
         </div>
 
         <aside className="space-y-6">
-          <Card title="Équipe de soins">
+          <Card id="equipe" title="Équipe de soins">
             <ul className="space-y-2.5">
               {team.filter((m) => m.status !== "refusee").map((m) => (
                 <li key={m.id} className="flex items-start justify-between gap-2">
@@ -282,7 +355,7 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
             <p className="mt-3 text-xs text-muted">Équipe composée par la coordination ({enrollment.coordinator_name}) et validée par le patient.</p>
           </Card>
 
-          <Card title="Séances">
+          <Card id="seances" title="Séances">
             <h3 className="mb-2 text-xs font-semibold text-muted uppercase">À venir</h3>
             {upcoming.length === 0 ? (
               <p className="mb-4 text-sm text-muted">Aucune séance planifiée.</p>

@@ -16,6 +16,7 @@ import { Badge, Card, EmptyState, EnrollmentStatusBadge, Notice, OfferBadge, Pro
 import { Timeline } from "@/components/timeline";
 import { IntakeView } from "@/components/intake-view";
 import { SubmitButton } from "@/components/submit-button";
+import { SectionNav } from "@/components/section-nav";
 
 const CHANNEL_LABEL = { email: "Email", sms: "SMS", telephone: "Téléphone" } as const;
 
@@ -40,6 +41,29 @@ export default async function CoordinationFilePage({ params }: PageProps<"/coord
     (acc[p.profession] ??= []).push(p);
     return acc;
   }, {});
+
+  // What this file needs from the coordinator, each with a shortcut to where it is done.
+  const current = timeline.find((s) => s.status === "en_cours");
+  const nowMs = new Date(now).getTime();
+  const todos: { label: string; href: string; tone: "danger" | "ongoing" }[] = [];
+  if (enrollment.status === "actif") {
+    if (!file.intakeSubmittedAt) {
+      const days = Math.floor((nowMs - new Date(`${enrollment.start_date}T00:00:00`).getTime()) / 86_400_000);
+      todos.push({ label: `Questionnaire non envoyé (J+${days}) : relancer`, href: "#relances", tone: file.relances.length ? "ongoing" : "danger" });
+    }
+    for (const m of team.filter((t) => t.status === "proposee")) {
+      todos.push({ label: `${fullName(m)} proposé·e : en attente du patient`, href: "#relances", tone: "ongoing" });
+    }
+    if (current?.profession === "coordinateur") todos.push({ label: `${current.title} : à faire`, href: "#parcours", tone: "ongoing" });
+    if (current?.title === "Choix de la suite") todos.push({ label: "Choix de la suite en attente : relancer", href: "#relances", tone: "ongoing" });
+    if (current && !["patient", "coordinateur"].includes(current.profession) && !upcoming.some((u) => u.enrollment_step_id === current.id)) {
+      todos.push({ label: `${current.title} : séance à planifier`, href: "#parcours", tone: "ongoing" });
+    }
+    if (enrollment.coordinated_until) {
+      const left = Math.round((new Date(`${enrollment.coordinated_until}T12:00:00`).getTime() - nowMs) / 86_400_000);
+      if (left >= 0 && left <= 30) todos.push({ label: `Fin de coordination dans ${left} j`, href: "#parcours", tone: "ongoing" });
+    }
+  }
 
   const stepActions = (step: TimelineStep) => {
     if (!editable || step.status === "realisee" || step.status === "non_retenue") return null;
@@ -101,7 +125,10 @@ export default async function CoordinationFilePage({ params }: PageProps<"/coord
               <OfferBadge offer={enrollment.offer} />
               <EnrollmentStatusBadge status={enrollment.status} />
             </div>
-            <p className="mt-1 text-sm text-muted">{patient.phone} · {patient.email}</p>
+            <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+              <a href={`tel:${patient.phone.replace(/s/g, "")}`} className="text-brand hover:underline">📞 {patient.phone}</a>
+              <a href={`mailto:${patient.email}`} className="text-brand hover:underline">✉ {patient.email}</a>
+            </p>
             <p className="mt-1 text-sm">
               {enrollment.goal_title}
               {enrollment.goal_date && <span className="text-muted"> · course le {formatDate(enrollment.goal_date)}</span>}
@@ -120,6 +147,35 @@ export default async function CoordinationFilePage({ params }: PageProps<"/coord
         </div>
       </section>
 
+      <Card title="À faire pour ce parcours">
+        {todos.length === 0 ? (
+          <p className="text-sm text-muted">✓ Rien à faire pour le moment.</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {todos.map((t) => (
+              <li key={t.label}>
+                <a
+                  href={t.href}
+                  className={`inline-block rounded-full px-3 py-1 text-sm font-medium transition hover:opacity-80 ${t.tone === "danger" ? "bg-danger-soft text-danger" : "bg-ongoing-soft text-ongoing"}`}
+                >
+                  {t.label} →
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <SectionNav
+        items={[
+          { id: "parcours", label: "Parcours" },
+          { id: "relances", label: "Relances" },
+          { id: "equipe", label: "Équipe" },
+          { id: "seances", label: "Séances" },
+          { id: "questionnaire", label: "Organisation" },
+        ]}
+      />
+
       <Notice>
         <strong>Vue logistique.</strong> Vous voyez l&apos;organisation du parcours (étapes, rendez-vous, équipe, section
         « Organisation » du questionnaire). Les réponses de santé, les notes et les comptes rendus restent réservés à l&apos;équipe de
@@ -128,8 +184,8 @@ export default async function CoordinationFilePage({ params }: PageProps<"/coord
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
-          <Card title="Parcours">
-            <Timeline steps={timeline} startDate={enrollment.start_date} actions={stepActions} />
+          <Card id="parcours" title="Parcours">
+            <Timeline steps={timeline} startDate={enrollment.start_date} actions={stepActions} collapseFinished />
             {enrollment.offer === "parcours" && editable && (
               <form action={addPlanStep} className="mt-6 grid gap-2 border-t border-border pt-4 sm:grid-cols-[1fr_120px_auto]">
                 <input type="hidden" name="enrollmentId" value={enrollment.id} />
@@ -150,7 +206,7 @@ export default async function CoordinationFilePage({ params }: PageProps<"/coord
             )}
           </Card>
 
-          <Card title="Relances" action={file.relances[0] && <span className="text-xs text-muted">Dernière le {formatDate(file.relances[0].created_at)}</span>}>
+          <Card id="relances" title="Relances" action={file.relances[0] && <span className="text-xs text-muted">Dernière le {formatDate(file.relances[0].created_at)}</span>}>
             {editable && (
               <form action={addRelance} className="mb-4 grid gap-2 sm:grid-cols-[140px_1fr_auto]">
                 <input type="hidden" name="enrollmentId" value={enrollment.id} />
@@ -183,7 +239,7 @@ export default async function CoordinationFilePage({ params }: PageProps<"/coord
         </div>
 
         <aside className="space-y-6">
-          <Card title="Équipe de soins">
+          <Card id="equipe" title="Équipe de soins">
             <ul className="space-y-2.5">
               {team.map((m) => (
                 <li key={m.id} className="flex items-start justify-between gap-2">
@@ -218,7 +274,7 @@ export default async function CoordinationFilePage({ params }: PageProps<"/coord
             )}
           </Card>
 
-          <Card title="Séances à venir">
+          <Card id="seances" title="Séances à venir">
             {upcoming.length === 0 ? (
               <EmptyState>Aucune séance planifiée.</EmptyState>
             ) : (
@@ -235,6 +291,7 @@ export default async function CoordinationFilePage({ params }: PageProps<"/coord
           </Card>
 
           <Card
+            id="questionnaire"
             title="Questionnaire"
             action={file.intakeSubmittedAt ? <Badge className="bg-done-soft text-done">Envoyé le {formatDate(file.intakeSubmittedAt, { day: "numeric", month: "short" })}</Badge> : <Badge className="bg-danger-soft text-danger">Non envoyé</Badge>}
           >

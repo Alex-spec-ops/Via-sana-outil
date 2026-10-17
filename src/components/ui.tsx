@@ -69,9 +69,21 @@ export function ProfessionTag({ profession }: { profession: StepOwner }) {
   );
 }
 
-export function Card({ title, action, children, className = "" }: { title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
+export function Card({
+  id,
+  title,
+  action,
+  children,
+  className = "",
+}: {
+  id?: string;
+  title?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <section className={`card p-5 ${className}`}>
+    <section id={id} className={`card p-5 ${id ? "scroll-mt-48 sm:scroll-mt-36" : ""} ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           {title && <h2 className="text-base font-semibold">{title}</h2>}

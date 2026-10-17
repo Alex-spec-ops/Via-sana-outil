@@ -554,7 +554,7 @@ export async function getLogisticsFile(coordinator: CoordinatorUser, patientId: 
     intakeSubmittedAt: intake?.submitted_at ?? null,
     organisation,
     organisationAnswers,
-    reportPublished: Boolean(get("SELECT 1 AS ok FROM reports WHERE enrollment_id = ? AND published_at IS NOT NULL", enrollment.id)),
+    reportPublished: Boolean(await get("SELECT 1 AS ok FROM reports WHERE enrollment_id = ? AND published_at IS NOT NULL", enrollment.id)),
     relances: await all<RelanceRow>("SELECT id, channel, reason, created_at FROM relances WHERE enrollment_id = ? ORDER BY created_at DESC", enrollment.id),
     partners: await all<PartnerRow>(
       `SELECT id, first_name, last_name, title, profession, specialty, location FROM practitioners

@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { requirePractitioner } from "@/lib/auth";
 import { ENROLLMENT_STATUS_LABEL, OFFER_LABEL, PROFESSION_LABEL } from "@/lib/domain";
-import { age, formatDate, formatDateTime } from "@/lib/format";
+import { age, formatDate } from "@/lib/format";
 import { clinicalAlerts, listPatientsForPractitioner, upcomingSessionsForPractitioner } from "@/lib/queries";
 import { Badge, Card, EmptyState, EnrollmentStatusBadge, OfferBadge, ProgressBar } from "@/components/ui";
+import { AgendaList } from "@/components/agenda-list";
+import { FilterForm } from "@/components/filter-form";
+import { WorkQueue, type QueueItem } from "@/components/work-queue";
 
 export default async function PatientsPage({ searchParams }: PageProps<"/praticien">) {
   const me = await requirePractitioner();
@@ -16,6 +19,28 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
   const upcoming = await upcomingSessionsForPractitioner(me.id);
   const stepTitles = [...new Set(everyone.map((r) => r.current_step_title).filter(Boolean))] as string[];
   const activeFilters = Object.values(filters).some(Boolean);
+
+  // What needs this practitioner, most urgent first: pain reported, report to hand over, their step in progress.
+  const queue: QueueItem[] = everyone
+    .filter((p) => p.status === "actif")
+    .map((p) => {
+      const tasks: QueueItem["tasks"] = [];
+      let anchor = "parcours";
+      if (p.last_pain !== null && p.last_pain >= 5) {
+        tasks.push({ label: `Douleur déclarée ${p.last_pain}/10`, tone: "danger" });
+        anchor = "suivi";
+      }
+      if (p.is_referent === 1 && p.plan_pending > 0) {
+        tasks.push({ label: "Compte rendu à remettre", tone: "ongoing" });
+        if (anchor === "parcours") anchor = "compte-rendu";
+      }
+      if (p.current_step_profession === me.profession && p.current_step_title !== "Plan d'action remis") {
+        tasks.push({ label: `${p.current_step_title}${p.current_step_has_session ? "" : " · séance à fixer"}`, tone: "ongoing" });
+      }
+      return { key: p.enrollment_id, href: `/praticien/patients/${p.patient_id}#${anchor}`, who: `${p.first_name} ${p.last_name}`, detail: p.goal_title, tasks };
+    })
+    .filter((item) => item.tasks.length > 0)
+    .sort((a, b) => Number(b.tasks.some((t) => t.tone === "danger")) - Number(a.tasks.some((t) => t.tone === "danger")) || b.tasks.length - a.tasks.length);
 
   const stats = [
     { label: "Patients suivis", value: everyone.filter((p) => p.status !== "termine").length },
@@ -30,6 +55,8 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
         <h1 className="text-2xl font-semibold">Bonjour {me.first_name}</h1>
         <p className="text-sm text-muted">Vous voyez uniquement les patients qui vous ont accepté dans leur équipe de soins.</p>
       </div>
+
+      <WorkQueue items={queue} emptyText="Rien d'urgent : aucun signal ni compte rendu en attente." />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {stats.map((s) => {
@@ -49,7 +76,7 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
         <Card className="min-w-0">
-          <form className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1.3fr_auto]" method="get">
+          <FilterForm className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1.3fr_auto]">
             <input name="q" defaultValue={filters.q} placeholder="Rechercher un patient…" className="input" aria-label="Rechercher" />
             <select name="offre" defaultValue={filters.offer ?? ""} className="input" aria-label="Offre">
               <option value="">Toutes les offres</option>
@@ -64,10 +91,10 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
               {stepTitles.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
             <div className="flex gap-2">
-              <button className="btn btn-primary" type="submit">Filtrer</button>
+              <button className="btn btn-primary" type="submit">Rechercher</button>
               {activeFilters && <Link href="/praticien" className="btn btn-secondary">Effacer</Link>}
             </div>
-          </form>
+          </FilterForm>
 
           {patients.length === 0 ? (
             <EmptyState>Aucun patient ne correspond à ces filtres.</EmptyState>
@@ -88,9 +115,9 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
                   {patients.map((p) => {
                     const alerts = clinicalAlerts(p);
                     return (
-                      <tr key={p.enrollment_id} className="border-b border-border align-top last:border-0 hover:bg-background">
+                      <tr key={p.enrollment_id} className="relative border-b border-border align-top last:border-0 hover:bg-background">
                         <td className="px-5 py-3">
-                          <Link href={`/praticien/patients/${p.patient_id}`} className="font-medium text-brand hover:underline">
+                          <Link href={`/praticien/patients/${p.patient_id}`} className="font-medium text-brand after:absolute after:inset-0 hover:underline">
                             {p.first_name} {p.last_name}
                           </Link>
                           <p className="text-xs text-muted">{age(p.birth_date)} ans · {p.goal_title}</p>
@@ -126,21 +153,12 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
         </Card>
 
         <Card title="Mes prochaines séances">
-          {upcoming.length === 0 ? (
-            <EmptyState>Aucune séance planifiée.</EmptyState>
-          ) : (
-            <ul className="space-y-3">
-              {upcoming.map((s) => (
-                <li key={s.id} className="border-l-2 border-brand pl-3">
-                  <p className="text-sm font-medium first-letter:uppercase">{formatDateTime(s.starts_at)}</p>
-                  <Link href={`/praticien/patients/${s.patient_id}`} className="text-sm text-brand hover:underline">
-                    {s.first_name} {s.last_name}
-                  </Link>
-                  <p className="text-xs text-muted">{s.step_title ?? "Séance de suivi"} · {s.duration_min} min</p>
-                </li>
-              ))}
-            </ul>
-          )}
+          <AgendaList
+            items={upcoming.map((s) => ({
+              id: s.id, starts_at: s.starts_at, duration_min: s.duration_min, href: `/praticien/patients/${s.patient_id}`,
+              who: `${s.first_name} ${s.last_name}`, what: s.step_title ?? "Séance de suivi",
+            }))}
+          />
         </Card>
       </div>
     </div>

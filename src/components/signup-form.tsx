@@ -103,7 +103,7 @@ export function SignupForm() {
           je consulte dans le cadre du parcours.
         </span>
       </label>
-      <SubmitButton className="w-full py-3 text-base">Créer mon compte et continuer</SubmitButton>
+      <SubmitButton className="w-full py-3 text-base" pendingLabel="Création du compte…">Créer mon compte et continuer</SubmitButton>
       <p className="text-center text-xs text-muted">Sans engagement. Vous pourrez vous arrêter après le bilan.</p>
     </form>
   );

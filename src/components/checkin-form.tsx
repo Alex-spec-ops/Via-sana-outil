@@ -49,7 +49,7 @@ export function CheckinForm() {
         <input id="comment" name="comment" maxLength={500} className="input" placeholder="Sensations, gêne, imprévu…" />
       </div>
       <div>
-        <SubmitButton>Envoyer mon suivi</SubmitButton>
+        <SubmitButton pendingLabel="Envoi…">Envoyer mon suivi</SubmitButton>
         <p className="mt-2 text-xs text-muted">
           Visible par vos praticiens uniquement. En cas de douleur forte ou de symptôme inquiétant, contactez votre médecin ou le 15.
         </p>

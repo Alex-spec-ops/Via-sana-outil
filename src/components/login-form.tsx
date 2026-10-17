@@ -48,7 +48,7 @@ export function LoginForm({ groups, demoPassword }: { groups: DemoGroup[]; demoP
             value={password} onChange={(e) => setPassword(e.target.value)} className="input"
           />
         </div>
-        <SubmitButton className="w-full py-3 text-base">Se connecter</SubmitButton>
+        <SubmitButton className="w-full py-3 text-base" pendingLabel="Connexion…">Se connecter</SubmitButton>
         <p className="text-xs text-muted">
           Après 5 essais infructueux, le compte est suspendu 15 minutes. Le mot de passe n&apos;est jamais stocké en clair.
         </p>

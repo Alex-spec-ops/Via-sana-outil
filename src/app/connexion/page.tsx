@@ -7,6 +7,7 @@ import { OFFER_LABEL, PROFESSION_LABEL } from "@/lib/domain";
 import { fullName, initials } from "@/lib/format";
 import { DEMO_PASSWORD } from "@/lib/passwords";
 import { LoginForm, type DemoGroup } from "@/components/login-form";
+import { SubmitButton } from "@/components/submit-button";
 
 const HOME = { practitioner: "/praticien", patient: "/patient", coordinator: "/coordination" } as const;
 
@@ -64,7 +65,7 @@ export default async function ConnexionPage() {
       <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-xs text-muted">
         <p>Inspiré de l&apos;offre PrépaMarathon (prepamarathon.com). Toutes les personnes et données sont fictives.</p>
         <form action={resetDemo}>
-          <button type="submit" className="btn btn-secondary text-xs">Réinitialiser les données de démo</button>
+          <SubmitButton variant="secondary" className="text-xs" pendingLabel="Réinitialisation… (environ 30 s)">Réinitialiser les données de démo</SubmitButton>
         </form>
       </footer>
     </main>
