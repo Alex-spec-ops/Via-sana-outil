@@ -544,6 +544,7 @@ export async function addCheckin(formData: FormData) {
     km, pain === null ? null : Math.round(pain), fatigue === null ? null : Math.round(fatigue), text(formData, "comment", 500),
   );
   refresh();
+  redirect("/patient?suivi=envoye#suivi");
 }
 
 export async function setSharingOpposition(formData: FormData) {

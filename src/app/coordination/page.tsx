@@ -117,7 +117,7 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
                         <td className="px-5 py-3">
                           <div className="flex flex-col items-start gap-1">
                             {todos.length === 0 ? <span className="text-xs text-muted">Rien à faire</span> : todos.map((t) => (
-                              <Badge key={t} className="bg-current-soft text-current">{t}</Badge>
+                              <Badge key={t} className="bg-ongoing-soft text-ongoing">{t}</Badge>
                             ))}
                             {r.last_relance_at && <span className="text-xs text-muted">Relancé le {formatDate(r.last_relance_at, { day: "numeric", month: "short" })}</span>}
                           </div>

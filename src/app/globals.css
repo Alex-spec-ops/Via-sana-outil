@@ -11,8 +11,8 @@
   --brand-soft: #e3f1ed;
   --done: #2f7d4f;
   --done-soft: #e5f3ea;
-  --current: #b4690e;
-  --current-soft: #fcefdc;
+  --ongoing: #b4690e;
+  --ongoing-soft: #fcefdc;
   --upcoming: #66727a;
   --upcoming-soft: #eef0f2;
   --danger: #b42318;
@@ -30,8 +30,8 @@
   --color-brand-soft: var(--brand-soft);
   --color-done: var(--done);
   --color-done-soft: var(--done-soft);
-  --color-current: var(--current);
-  --color-current-soft: var(--current-soft);
+  --color-ongoing: var(--ongoing);
+  --color-ongoing-soft: var(--ongoing-soft);
   --color-upcoming: var(--upcoming);
   --color-upcoming-soft: var(--upcoming-soft);
   --color-danger: var(--danger);

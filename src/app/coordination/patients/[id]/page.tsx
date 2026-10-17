@@ -57,7 +57,7 @@ export default async function CoordinationFilePage({ params }: PageProps<"/coord
     return (
       <div className="mt-3 flex flex-wrap items-start gap-2">
         {candidates.length === 0 ? (
-          <Badge className="bg-current-soft text-current">
+          <Badge className="bg-ongoing-soft text-ongoing">
             {team.some((m) => m.status === "proposee" && m.profession === step.profession)
               ? `${PROFESSION_LABEL[step.profession]} proposé·e : en attente de validation par le patient`
               : `Aucun ${PROFESSION_LABEL[step.profession].toLowerCase()} dans l'équipe : à proposer`}
@@ -194,7 +194,7 @@ export default async function CoordinationFilePage({ params }: PageProps<"/coord
                   {m.status === "acceptee" ? (
                     m.is_referent === 1 ? <Badge className="bg-brand-soft text-brand">Référent bilan</Badge> : <Badge className="bg-done-soft text-done">Validé</Badge>
                   ) : m.status === "proposee" ? (
-                    <Badge className="bg-current-soft text-current">En attente du patient</Badge>
+                    <Badge className="bg-ongoing-soft text-ongoing">En attente du patient</Badge>
                   ) : (
                     <Badge className="bg-upcoming-soft text-upcoming">Refusé</Badge>
                   )}

@@ -12,14 +12,14 @@ import {
 
 const STEP_TONE: Record<StepStatus, string> = {
   realisee: "bg-done-soft text-done",
-  en_cours: "bg-current-soft text-current",
+  en_cours: "bg-ongoing-soft text-ongoing",
   a_venir: "bg-upcoming-soft text-upcoming",
   non_retenue: "bg-upcoming-soft text-upcoming line-through",
 };
 
 const ENROLLMENT_TONE: Record<EnrollmentStatus, string> = {
   actif: "bg-brand-soft text-brand",
-  en_pause: "bg-current-soft text-current",
+  en_pause: "bg-ongoing-soft text-ongoing",
   termine: "bg-upcoming-soft text-upcoming",
 };
 
@@ -102,7 +102,7 @@ export function EmptyState({ children }: { children: ReactNode }) {
 export function Notice({ tone = "brand", children }: { tone?: "brand" | "current" | "done" | "danger"; children: ReactNode }) {
   const tones = {
     brand: "border-brand/20 bg-brand-soft text-brand",
-    current: "border-current/30 bg-current-soft text-current",
+    current: "border-ongoing/30 bg-ongoing-soft text-ongoing",
     done: "border-done/30 bg-done-soft text-done",
     danger: "border-danger/30 bg-danger-soft text-danger",
   };

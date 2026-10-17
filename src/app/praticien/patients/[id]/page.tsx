@@ -272,7 +272,7 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
                     <ProfessionTag profession={m.profession} />
                   </div>
                   {m.status === "proposee" ? (
-                    <Badge className="bg-current-soft text-current">Proposé·e</Badge>
+                    <Badge className="bg-ongoing-soft text-ongoing">Proposé·e</Badge>
                   ) : m.is_referent === 1 ? (
                     <Badge className="bg-brand-soft text-brand">Référent bilan</Badge>
                   ) : null}

@@ -60,6 +60,7 @@ export type EnrollmentRow = {
   pathway_name: string;
   coordinator_id: string;
   coordinator_name: string;
+  coordinator_email: string;
   offer: Offer;
   status: EnrollmentStatus;
   start_date: string;
@@ -174,7 +175,7 @@ export type AccessLogRow = {
 export type IntakeRow = { answers: IntakeAnswers; submitted_at: string | null; updated_at: string };
 
 const ENROLLMENT_SELECT = `
-  SELECT e.*, pw.name AS pathway_name, co.first_name || ' ' || co.last_name AS coordinator_name
+  SELECT e.*, pw.name AS pathway_name, co.first_name || ' ' || co.last_name AS coordinator_name, co.email AS coordinator_email
     FROM enrollments e
     JOIN pathways pw ON pw.id = e.pathway_id
     JOIN coordinators co ON co.id = e.coordinator_id`;
