@@ -104,7 +104,7 @@ src/
     schema.ts    Modèle relationnel (SQL)
     pathway.ts   Règles du parcours : phases, étape en cours, étapes optionnelles, catalogue
     queries.ts   Lectures avec autorisation (3 rôles + partage externe)
-    seed.ts      Jeu de données fictif (8 coureurs, 8 praticiens, 1 coordinatrice)
+    seed.ts      Jeu de données fictif (9 coureurs dont le compte du jury, 8 praticiens, 1 coordinatrice)
     domain.ts    Professions, offres, questionnaire, dimensions du bilan
     auth.ts      Session signée HMAC (cookie httpOnly)
 ```
@@ -123,6 +123,8 @@ src/
 - Déploiement Vercel : la base de démo est recréée à chaque démarrage à froid.
 
 ## Scénario de démonstration (≈ 8 min)
+
+**Compte du jury** : `jury.demo@exemple.fr`, avec le mot de passe de démonstration commun. C'est un coureur qui vient de s'inscrire : à la connexion, il arrive sur son questionnaire. Le compte fait partie des données de démo, donc la réinitialisation le recrée à l'identique. Une vidéo de 2 minutes, sans voix off, montre sa création (inscription, mot de passe refusé puis accepté, questionnaire, reconnexion).
 
 Avant de commencer : « Réinitialiser les données de démo » sur `/connexion` (environ 30 secondes), puis retour à l'accueil. Pour changer de profil : « Se déconnecter », puis un clic sur le compte fictif remplit le formulaire de connexion.
 

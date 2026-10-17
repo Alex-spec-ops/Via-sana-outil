@@ -83,7 +83,9 @@ type PatientDef = {
   first: string;
   last: string;
   birth: string;
-  sex: "F" | "M";
+  sex: "F" | "M" | "X";
+  /** Login email when it is not firstname.lastname@exemple.fr */
+  email?: string;
   offer: "bilan" | "parcours";
   status: "actif" | "en_pause" | "termine";
   startDaysAgo: number;
@@ -259,6 +261,12 @@ const PATIENTS: PatientDef[] = [
       regime: "Omnivore", troubles_digestifs: false, sommeil: 7, stress: 4, attentes: "Comprendre l'origine de la douleur",
     },
   },
+  {
+    // The jury's own account: a client who has just signed up and starts the questionnaire.
+    id: "pa-jury", first: "Jury", last: "Démo", email: "jury.demo@exemple.fr", birth: "1990-04-12", sex: "X", offer: "bilan", status: "actif",
+    startDaysAgo: 0, team: [{ id: "pr-petit" }], states: "EAAAA", noUpcomingSession: true,
+    goal: { title: "Finir le Marathon de Paris 2027", detail: "", raceInWeeks: 26 }, intake: null,
+  },
 ];
 
 const REPORTS: Record<string, { findings: Record<string, string>; recommendations: string; plan: string }> = {
@@ -390,7 +398,7 @@ export async function seed(db: Db) {
   for (const [index, p] of PATIENTS.entries()) {
     const start = now - p.startDaysAgo * DAY;
     const enrollmentId = `en-${p.id.slice(3)}`;
-    await insPatient(p.id, p.first, p.last, p.birth, p.sex, `${ascii(p.first)}.${p.last.toLowerCase()}@exemple.fr`, `06 00 00 0${index} ${10 + index}`, at(start, -1));
+    await insPatient(p.id, p.first, p.last, p.birth, p.sex, p.email ?? `${ascii(p.first)}.${p.last.toLowerCase()}@exemple.fr`, `06 00 00 0${index} ${10 + index}`, at(start, -1));
     await insEnrollment(
       enrollmentId, p.id, PATHWAY.id, COORDINATOR.id, p.offer, p.status, dateOnly(start, 0),
       p.offer === "parcours" ? dateOnly(start, 14 + 182) : null,
