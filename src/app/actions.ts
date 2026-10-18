@@ -206,11 +206,13 @@ export async function startBilan(_prev: SignupState, formData: FormData): Promis
   const goalInput = text(formData, "goal", 120);
   const goal = goalInput || "Préparer ma course";
   const sex = ["F", "M", "X"].includes(text(formData, "sex")) ? text(formData, "sex") : "X";
+  // Explicit, optional consent to sharing between the practitioners of the care team (CSP L1110-4 III).
+  const sharing = text(formData, "sharing") === "1";
   const rawPassword = formData.get("password");
   const password = typeof rawPassword === "string" ? rawPassword : "";
   const confirmation = formData.get("password_confirmation");
   // Passwords are never sent back to the browser.
-  const values = { first_name: first, last_name: last, email, phone, birth_date: birth, goal: goalInput, sex };
+  const values = { first_name: first, last_name: last, email, phone, birth_date: birth, goal: goalInput, sex, sharing: sharing ? "1" : "" };
   const fail = (error: string): SignupState => ({ error, values });
 
   if (!first || !last || !/^\S+@\S+\.\S+$/.test(email) || !/^\d{4}-\d{2}-\d{2}$/.test(birth) || text(formData, "consent") !== "1") {
@@ -249,9 +251,9 @@ export async function startBilan(_prev: SignupState, formData: FormData): Promis
       email, patientId, authUserId, now,
     );
     await tx.run(
-      `INSERT INTO enrollments (id, patient_id, pathway_id, coordinator_id, offer, status, start_date, goal_title, goal_detail)
-       VALUES (?, ?, 'pw-prepa', ?, 'bilan', 'actif', ?, ?, '')`,
-      enrollmentId, patientId, coordinator.id, now.slice(0, 10), goal,
+      `INSERT INTO enrollments (id, patient_id, pathway_id, coordinator_id, offer, status, start_date, goal_title, goal_detail, sharing_opposed, consent_updated_at)
+       VALUES (?, ?, 'pw-prepa', ?, 'bilan', 'actif', ?, ?, '', ?, ?)`,
+      enrollmentId, patientId, coordinator.id, now.slice(0, 10), goal, sharing ? 0 : 1, now,
     );
     // The partner physio who runs the bilans: the client accepts them by signing up for the bilan.
     await tx.run(
@@ -263,6 +265,7 @@ export async function startBilan(_prev: SignupState, formData: FormData): Promis
   });
   await startSession({ type: "patient", id: patientId });
   await logAccess("patient", patientId, patientId, "inscription");
+  await logAccess("patient", patientId, patientId, sharing ? "consentement_partage" : "refus_partage");
   refresh();
   redirect("/patient/formulaire");
 }
@@ -647,6 +650,7 @@ export async function addCheckin(formData: FormData) {
   redirect("/patient?suivi=envoye#suivi");
 }
 
+/** Gives or withdraws the consent to sharing between practitioners, at any time. */
 export async function setSharingOpposition(formData: FormData) {
   const { patient, enrollment } = await currentEnrollment();
   const opposed = text(formData, "opposed") === "1";

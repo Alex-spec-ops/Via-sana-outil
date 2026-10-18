@@ -579,7 +579,7 @@ async function insertPatients(db: Db, now: number, patients: PatientDef[], first
       enrollmentId, p.id, p.pathway ?? PATHWAY.id, COORDINATOR.id, p.offer, p.status, dateOnly(start, 0),
       p.offer === "parcours" ? dateOnly(start, 14 + (p.pathway === TRAIL.id ? 126 : 182)) : null,
       p.goal.title, p.goal.raceInWeeks !== undefined ? dateOnly(now, p.goal.raceInWeeks * 7 - 1) : null,
-      p.goal.detail, p.opposed ? 1 : 0, p.opposed ? at(now, -10, 18, 12) : null,
+      p.goal.detail, p.opposed ? 1 : 0, p.opposed ? at(now, -10, 18, 12) : at(start, 0, 20, 10),
     );
     for (const [i, m] of p.team.entries()) {
       await insTeam(enrollmentId, m.id, m.status ?? "acceptee", i === 0 ? 1 : 0,

@@ -215,10 +215,10 @@ export default async function PatientFilePage({ params }: PageProps<"/praticien/
 
       {enrollment.sharing_opposed === 1 && (
         <Notice tone="current">
-          <strong>Le patient s&apos;est opposé au partage d&apos;informations entre praticiens</strong>
+          <strong>Le patient n&apos;a pas donné son accord au partage d&apos;informations entre praticiens</strong>
           {enrollment.consent_updated_at && <> (le {formatDate(enrollment.consent_updated_at)})</>}. Vous ne voyez que vos propres notes et
           comptes rendus{file.hiddenNotesCount > 0 && <> — {file.hiddenNotesCount} note{file.hiddenNotesCount > 1 ? "s" : ""} de vos confrères sont masquées</>}.
-          Droit d&apos;opposition prévu à l&apos;art. L1110-4 IV du code de la santé publique.
+          Consentement prévu à l&apos;art. L1110-4 du code de la santé publique.
         </Notice>
       )}
 

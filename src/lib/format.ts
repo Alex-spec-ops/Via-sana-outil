@@ -74,8 +74,10 @@ export const ACTION_LABEL: Record<string, string> = {
   refus_praticien: "a refusé un praticien proposé",
   partage_externe: "a partagé son bilan hors de l'équipe",
   revocation_partage: "a révoqué un partage",
-  opposition_partage: "s'est opposé·e au partage entre praticiens",
-  levee_opposition_partage: "a autorisé le partage entre praticiens",
+  opposition_partage: "a retiré son accord au partage entre praticiens",
+  levee_opposition_partage: "a donné son accord au partage entre praticiens",
+  consentement_partage: "a donné son accord au partage entre praticiens (inscription)",
+  refus_partage: "n'a pas autorisé le partage entre praticiens (inscription)",
 };
 
 // The patient's own actions, as shown to them ("Vous …").
@@ -90,7 +92,9 @@ export const SELF_ACTION_LABEL: Record<string, string> = {
   refus_praticien: "avez refusé un praticien proposé",
   partage_externe: "avez partagé votre bilan hors de l'équipe",
   revocation_partage: "avez révoqué un partage",
-  opposition_partage: "vous êtes opposé·e au partage entre praticiens",
-  levee_opposition_partage: "avez autorisé le partage entre praticiens",
+  opposition_partage: "avez retiré votre accord au partage entre praticiens",
+  levee_opposition_partage: "avez donné votre accord au partage entre praticiens",
+  consentement_partage: "avez donné votre accord au partage entre praticiens, à l'inscription",
+  refus_partage: "n'avez pas autorisé le partage entre praticiens, à l'inscription",
   lecture_compte_rendu: "avez consulté votre compte rendu",
 };

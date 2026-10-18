@@ -85,25 +85,27 @@ export default async function PrivacyPage() {
         <p className="text-sm">
           {opposed ? (
             <>
-              <strong>Vous vous êtes opposé·e au partage</strong>
-              {enrollment.consent_updated_at && <> le {formatDate(enrollment.consent_updated_at)}</>}. Chaque praticien ne voit que ses
-              propres notes et comptes rendus.
+              <strong>Le partage entre vos praticiens n&apos;est pas autorisé</strong>
+              {enrollment.consent_updated_at && <> (votre choix du {formatDate(enrollment.consent_updated_at)})</>}. Chaque praticien ne voit que
+              ses propres notes et comptes rendus.
             </>
           ) : (
             <>
-              Vos praticiens partagent entre eux les informations <strong>strictement nécessaires</strong> à la coordination de votre
-              parcours. Vous pouvez vous y opposer à tout moment.
+              <strong>Vous avez donné votre accord</strong>
+              {enrollment.consent_updated_at && <> le {formatDate(enrollment.consent_updated_at)}</>} : vos praticiens partagent entre eux
+              les informations <strong>strictement nécessaires</strong> à la coordination de votre parcours. Vous pouvez le retirer à tout
+              moment.
             </>
           )}
         </p>
         <form action={setSharingOpposition} className="mt-4 flex flex-wrap items-center gap-3">
           <input type="hidden" name="opposed" value={opposed ? "0" : "1"} />
           <SubmitButton variant={opposed ? "primary" : "secondary"}>
-            {opposed ? "Autoriser à nouveau le partage" : "M'opposer au partage entre praticiens"}
+            {opposed ? "Donner mon accord au partage" : "Retirer mon accord au partage"}
           </SubmitButton>
           {!opposed && <p className="text-xs text-muted">Sans partage, la coordination de votre parcours sera moins efficace.</p>}
         </form>
-        <p className="mt-3 text-xs text-muted">Droit prévu à l&apos;article L1110-4 du code de la santé publique.</p>
+        <p className="mt-3 text-xs text-muted">Consentement préalable et droit d&apos;opposition prévus à l&apos;article L1110-4 (III et IV) du code de la santé publique.</p>
       </Card>
 
       <section id="partages" className="scroll-mt-24">

@@ -288,6 +288,8 @@ ALTER TABLE credentials ADD COLUMN IF NOT EXISTS demo INTEGER NOT NULL DEFAULT 0
 UPDATE credentials SET demo = 1 WHERE demo = 0 AND user_id NOT LIKE '%-%-%-%-%-%';
 -- Passwords now live in Supabase Auth only: drop the former local hashes (data minimisation).
 UPDATE credentials SET password_hash = NULL WHERE auth_user_id IS NOT NULL AND password_hash IS NOT NULL;
+-- Sharing between practitioners is now an explicit consent given at sign-up: older demo rows get their sign-up date.
+UPDATE enrollments SET consent_updated_at = start_date WHERE consent_updated_at IS NULL;
 `;
 
 /** Every table, children first — used to wipe the demo data. */

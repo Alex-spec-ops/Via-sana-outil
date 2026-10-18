@@ -103,6 +103,17 @@ export function SignupForm() {
           je consulte dans le cadre du parcours.
         </span>
       </label>
+      <label className="flex items-start gap-2 rounded-xl border border-border bg-surface-alt p-3 text-sm">
+        <input type="checkbox" name="sharing" value="1" defaultChecked={v.sharing === "1"} className="mt-1" />
+        <span>
+          <strong>Partage entre mes praticiens (facultatif).</strong> J&apos;autorise les praticiens de mon équipe PrépaMarathon, que
+          j&apos;accepte un par un, à partager entre eux les informations strictement nécessaires à la coordination de mon parcours.
+          <span className="mt-1 block text-xs text-muted">
+            Sans cet accord, chaque praticien ne voit que ses propres notes et comptes rendus. Vous pourrez le donner ou le retirer à
+            tout moment dans « Mes données » (art. L1110-4 du code de la santé publique).
+          </span>
+        </span>
+      </label>
       <SubmitButton className="w-full py-3 text-base" pendingLabel="Création du compte…">Créer mon compte et continuer</SubmitButton>
       <p className="text-center text-xs text-muted">Sans engagement. Vous pourrez vous arrêter après le bilan.</p>
     </form>

@@ -78,7 +78,7 @@ Les données fictives sont créées automatiquement au premier lancement. Le bou
 - Séances : bouton « Ajouter à mon agenda » (fichier `.ics`, uniquement la logistique : titre, praticien, lieu, heure).
 - Questionnaire (brouillon puis envoi) et suivi hebdomadaire : douleur et fatigue sur une échelle de 0 à 10 cliquable, confirmation après envoi.
 - Les phases terminées du parcours sont repliées ; l'espace est pensé d'abord pour le téléphone.
-- « Mes données » : qui voit quoi, opposition au partage, **partage du bilan avec son médecin traitant ou son kiné habituel** (consentement explicite, lien révocable, ouvertures tracées), journal des accès.
+- « Mes données » : qui voit quoi, accord au partage entre praticiens (donné ou retiré à tout moment), **partage du bilan avec son médecin traitant ou son kiné habituel** (consentement explicite, lien révocable, ouvertures tracées), journal des accès.
 
 ## Protection des données : du texte de loi au code
 
@@ -89,7 +89,7 @@ L'analyse complète, avec les liens Légifrance, est dans [`docs/brief-et-cadre-
 | Accès réservé à l'équipe de soins reconnue par le patient | CSP L1110-4, L1110-12 2° | Un praticien est **proposé** par la coordination et n'accède au dossier qu'**après acceptation** par le patient. Vérification à chaque lecture et action serveur (`src/lib/queries.ts`, `src/app/actions.ts`). |
 | La coordination n'est pas un professionnel de santé | Statut de Via Sana | Vue logistique dédiée (`getLogisticsFile`) qui ne sélectionne aucun champ clinique. Tentative de lecture d'un compte rendu refusée et tracée. |
 | Strictement nécessaire | CSP L1110-4 II-III | Chaque section du questionnaire déclare ses destinataires parmi les 8 professions et la coordination (`src/lib/domain.ts`). |
-| Opposition au partage | CSP L1110-4 IV | Chaque praticien ne voit plus que ses propres notes et comptes rendus. |
+| Consentement explicite au partage entre praticiens | CSP L1110-4 III et IV | À l'inscription, une case distincte, facultative et non cochée demande l'accord du coureur ; le choix est daté et inscrit au journal. Sans accord, ou après son retrait dans « Mes données », chaque praticien ne voit que ses propres notes et comptes rendus. |
 | Partage hors équipe | CSP L1110-4 III | Case de consentement obligatoire, lien à jeton révocable, chaque ouverture inscrite au journal du patient. |
 | Mots de passe et double authentification | CNIL délibération 2022-100 | Mots de passe stockés et vérifiés par Supabase Auth (jamais par l'application, jamais en clair) ; au moins 14 caractères (ou 12 avec un caractère spécial) mêlant majuscules, minuscules et chiffres ; message d'erreur unique ; compte suspendu 15 min après 5 échecs ; journal `auth_logs` sans mot de passe ni identifiant inconnu. **Double authentification** : code envoyé par email par Supabase, vérifié par Supabase. |
 | Cloisonnement et journalisation exploitée | CNIL SAN-2026-009 | Table `access_logs` (accès autorisés et refusés, praticiens, coordination, destinataires externes), visible par le patient. |
@@ -120,7 +120,7 @@ src/
 **Modèle de données.**
 - `pathways` et `pathway_steps` décrivent le parcours type, en deux phases (bilan, puis parcours coordonné).
 - `step_catalog` liste les étapes ajoutables selon les besoins.
-- `enrollments` porte l'offre, le statut, l'échéance de coordination et l'opposition.
+- `enrollments` porte l'offre, le statut, l'échéance de coordination et le choix de partage (accord ou non, daté).
 - `care_team` porte le statut de chaque praticien : proposé, accepté ou refusé.
 - `enrollment_steps` contient le plan propre à chaque patient.
 - Le reste : `sessions`, `reports`, `external_shares`, `notes`, `checkins`, `intake_forms`, `relances`, `access_logs`, et pour la connexion `credentials` (mots de passe hachés) et `auth_logs`.
