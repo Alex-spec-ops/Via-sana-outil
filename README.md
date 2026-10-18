@@ -132,7 +132,7 @@ src/
 
 ## Scénario de démonstration (≈ 8 min)
 
-**Compte du jury** : `jury.demo@exemple.fr`, avec le mot de passe de démonstration commun. C'est un coureur qui vient de s'inscrire : à la connexion, il arrive sur son questionnaire. Le compte fait partie des données de démo, donc la réinitialisation le recrée à l'identique. Une vidéo de 2 minutes, sans voix off, montre sa création (inscription, mot de passe refusé puis accepté, questionnaire, reconnexion).
+**Compte du jury** : `jury.demo@exemple.fr`, avec le mot de passe de démonstration commun. C'est un coureur qui vient de s'inscrire : à la connexion, il arrive sur son questionnaire. Le compte fait partie des données de démo, donc la réinitialisation le recrée à l'identique. Une vidéo de 2 minutes, sans voix off, montre sa création (inscription, mot de passe refusé puis accepté, questionnaire, reconnexion avec double authentification).
 
 Avant de commencer : se connecter comme Lucie Fontaine (coordination), « Réinitialiser les données de démo » en bas de son tableau de bord (environ 30 secondes) ; la session se ferme ensuite. Pour changer de profil : « Se déconnecter », « Se connecter », choisir la page (coureur, ou praticien partenaire, qui sert aussi à la coordination), puis un clic sur le compte fictif remplit le formulaire.
 
