@@ -274,6 +274,8 @@ export async function logout() {
 
 export async function resetDemo() {
   // Demo-only convenience: there is nothing but fictional data in this database.
+  // Reserved to the coordinator: anyone else could wipe the shared demo.
+  await requireCoordinator();
   await resetDemoData();
   // Supabase users of accounts created during the demo are removed, demo passwords restored.
   await syncAuthUsers().catch(() => {});

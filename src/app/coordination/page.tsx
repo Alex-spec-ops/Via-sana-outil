@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { resetDemo } from "@/app/actions";
 import { requireCoordinator } from "@/lib/auth";
 import { ENROLLMENT_STATUS_LABEL, OFFER_LABEL, PROFESSION_LABEL } from "@/lib/domain";
 import { formatDate } from "@/lib/format";
 import { coordinationTodos, listForCoordinator, listPathways, upcomingSessionsForCoordinator } from "@/lib/queries";
 import { Badge, Card, EmptyState, EnrollmentStatusBadge, OfferBadge, ProgressBar } from "@/components/ui";
 import { AgendaList } from "@/components/agenda-list";
+import { SubmitButton } from "@/components/submit-button";
 import { FilterForm } from "@/components/filter-form";
 import { WorkQueue, type QueueItem } from "@/components/work-queue";
 
@@ -171,6 +173,16 @@ export default async function CoordinationPage({ searchParams }: PageProps<"/coo
           />
         </Card>
       </div>
+
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border px-5 py-4 text-sm">
+        <p className="max-w-2xl text-muted">
+          <strong className="text-foreground">Données de démonstration.</strong> Remet tous les dossiers fictifs dans leur état de départ et
+          supprime les comptes créés depuis. Réservé à la coordination ; vous serez déconnectée.
+        </p>
+        <form action={resetDemo}>
+          <SubmitButton variant="secondary" className="text-xs" pendingLabel="Réinitialisation… (environ 30 s)">Réinitialiser les données de démo</SubmitButton>
+        </form>
+      </section>
     </div>
   );
 }

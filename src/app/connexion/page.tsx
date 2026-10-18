@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { resetDemo } from "@/app/actions";
 import { getSession } from "@/lib/auth";
 import { HOME, SPACES } from "@/lib/spaces";
-import { SubmitButton } from "@/components/submit-button";
 import { Wordmark } from "@/components/wordmark";
 
 const DOORS = [
@@ -60,9 +58,6 @@ export default async function ConnexionPage() {
 
       <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-xs text-muted">
         <p>Inspiré de l&apos;offre PrépaMarathon (prepamarathon.com). Toutes les personnes et données sont fictives.</p>
-        <form action={resetDemo}>
-          <SubmitButton variant="secondary" className="text-xs" pendingLabel="Réinitialisation… (environ 30 s)">Réinitialiser les données de démo</SubmitButton>
-        </form>
       </footer>
     </main>
   );
