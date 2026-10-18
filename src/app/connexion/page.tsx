@@ -15,16 +15,9 @@ const DOORS = [
   {
     href: SPACES.praticien.login,
     who: "Je suis praticien partenaire",
-    text: "Les coureurs qui m'ont accepté dans leur équipe de soins, leurs bilans et leur suivi.",
+    text: "Les coureurs qui m'ont accepté dans leur équipe de soins, leurs bilans et leur suivi. L'équipe de coordination Via Sana se connecte aussi ici.",
     tone: "bg-brand text-ecru",
     cta: "bg-azurin text-brand",
-  },
-  {
-    href: SPACES.coordination.login,
-    who: "Coordination Via Sana",
-    text: "L'organisation des parcours : questionnaires, rendez-vous, équipes, relances. Sans données de santé.",
-    tone: "bg-azurin text-brand",
-    cta: "bg-brand text-ecru",
   },
 ];
 
@@ -43,10 +36,10 @@ export default async function ConnexionPage() {
       <div className="mb-10 space-y-3 text-center">
         <Wordmark size="lg" sub={null} />
         <h1 className="text-4xl md:text-5xl">Se connecter à <span className="accent-serif">votre espace</span></h1>
-        <p className="text-muted">Chaque profil a sa propre page de connexion et ne voit que ce qui le concerne.</p>
+        <p className="text-muted">Une page pour les coureurs, une pour les professionnels : chaque compte ne voit ensuite que ce qui le concerne.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="mx-auto grid max-w-4xl gap-4 md:grid-cols-2">
         {DOORS.map((d) => (
           <Link key={d.href} href={d.href} className={`group flex flex-col gap-4 rounded-3xl p-7 transition hover:-translate-y-1 ${d.tone}`}>
             <h2 className="text-2xl">{d.who}</h2>

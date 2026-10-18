@@ -78,7 +78,7 @@ async function homeFor(type: CredentialRow["user_type"], id: string) {
 /**
  * Login, first factor. Supabase Auth checks the password; the app keeps its
  * own rules (CNIL recommendation 2022-100): one generic error message, each
- * space only accepts its own accounts, the account is suspended for 15 minutes
+ * login page only accepts its own accounts, the account is suspended for 15 minutes
  * after 5 failures in a row, and neither the password nor an unknown email is
  * written to the logs. A right password only starts the email step.
  */
@@ -89,11 +89,11 @@ export async function loginWithPassword(_prev: LoginState, formData: FormData): 
   if (!email || !password) return { error: LOGIN_ERROR };
   if (!supabaseAuthReady()) return { error: UNAVAILABLE };
 
-  // A wrong space is answered exactly like an unknown email: same message, same work.
+  // A wrong login page is answered exactly like an unknown email: same message, same work.
   const space = text(formData, "space", 20);
-  const expected = isSpace(space) ? SPACES[space].userType : null;
+  const accepted = isSpace(space) ? SPACES[space].userTypes : [];
   let credential = await get<CredentialRow>("SELECT * FROM credentials WHERE email = ?", email);
-  if (!credential || credential.user_type !== expected) {
+  if (!credential || !accepted.includes(credential.user_type)) {
     await checkPassword(email, password).catch(() => false);
     return { error: LOGIN_ERROR };
   }
@@ -186,7 +186,7 @@ export async function verifyLoginCode(_prev: VerifyState, formData: FormData): P
 export async function cancelLoginCode() {
   const step = await currentStep();
   await endStep(step);
-  redirect(step ? SPACES[step.space].login : "/connexion");
+  redirect((step && isSpace(step.space) && SPACES[step.space].login) || "/connexion");
 }
 
 export type SignupState = { error: string | null; values: Record<string, string> };

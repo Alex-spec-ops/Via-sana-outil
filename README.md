@@ -32,12 +32,11 @@ Variables d'environnement (`.env.local`, jamais versionné) : `DATABASE_URL` (ba
 
 Ouvrir http://localhost:3000 : la page d'accueil propose deux entrées.
 - « Commencer mon bilan » : inscription d'un nouveau client, qui arrive ensuite sur son questionnaire.
-- « Se connecter » : `/connexion` propose trois espaces, chacun avec sa page de connexion (email et mot de passe) :
+- « Se connecter » : `/connexion` propose deux pages de connexion (email et mot de passe) :
   - `/connexion/patient` pour les coureurs ;
-  - `/connexion/praticien` pour les praticiens partenaires ;
-  - `/connexion/coordination` pour l'équipe Via Sana.
+  - `/connexion/praticien` (« Je suis praticien partenaire ») pour les praticiens partenaires **et** l'équipe de coordination Via Sana. Chaque compte arrive ensuite sur son propre espace (`/praticien` ou `/coordination`). L'ancienne adresse `/connexion/coordination` redirige vers cette page.
 
-  Chaque page n'accepte que les comptes de son espace : un compte d'un autre espace reçoit le même message d'erreur qu'un mot de passe faux, sans révéler qu'il existe. Chaque page liste ses comptes fictifs (un clic remplit le formulaire), avec le mot de passe de démonstration commun `Demo-ViaSana-2026`.
+  Chaque page n'accepte que ses comptes : un compte coureur sur la page des professionnels (ou l'inverse) reçoit le même message d'erreur qu'un mot de passe faux, sans révéler qu'il existe. Chaque page liste ses comptes fictifs (un clic remplit le formulaire), avec le mot de passe de démonstration commun `Demo-ViaSana-2026`.
 
   **Double authentification par email, gérée par Supabase Auth** : Supabase vérifie le mot de passe, puis envoie un code par email à l'adresse du compte et le vérifie (page `/connexion/verification`). La session de l'application ne s'ouvre qu'après le code. L'application garde ses propres règles : 10 minutes, 5 essais (puis échec compté sur le compte), 3 renvois, chaque étape inscrite au journal. Les comptes de démonstration ont des adresses fictives : aucun email ne leur est envoyé, Supabase génère leur code sans l'envoyer et une « boîte mail de démonstration » l'affiche (Supabase le vérifie quand même).
 
@@ -135,7 +134,7 @@ src/
 
 **Compte du jury** : `jury.demo@exemple.fr`, avec le mot de passe de démonstration commun. C'est un coureur qui vient de s'inscrire : à la connexion, il arrive sur son questionnaire. Le compte fait partie des données de démo, donc la réinitialisation le recrée à l'identique. Une vidéo de 2 minutes, sans voix off, montre sa création (inscription, mot de passe refusé puis accepté, questionnaire, reconnexion).
 
-Avant de commencer : se connecter comme Lucie Fontaine (coordination), « Réinitialiser les données de démo » en bas de son tableau de bord (environ 30 secondes) ; la session se ferme ensuite. Pour changer de profil : « Se déconnecter », « Se connecter », choisir l'espace, puis un clic sur le compte fictif remplit le formulaire.
+Avant de commencer : se connecter comme Lucie Fontaine (coordination), « Réinitialiser les données de démo » en bas de son tableau de bord (environ 30 secondes) ; la session se ferme ensuite. Pour changer de profil : « Se déconnecter », « Se connecter », choisir la page (coureur, ou praticien partenaire, qui sert aussi à la coordination), puis un clic sur le compte fictif remplit le formulaire.
 
 0. **Un nouveau coureur** : sur la page d'accueil, « Commencer mon bilan ».
    - Inscription avec des informations fictives et un mot de passe : un mot de passe trop faible est refusé, puis on arrive directement sur le questionnaire.

@@ -1,13 +1,13 @@
-// The three spaces of the tool, each with its own login page. A login page
-// only accepts accounts of its own kind (see loginWithPassword).
+// The two login pages of the tool. Runners log in on theirs; health
+// professionals and the Via Sana coordination share the professionals' page.
+// A login page only accepts the accounts it lists (see loginWithPassword).
 
-export type SpaceSlug = "patient" | "praticien" | "coordination";
+export type SpaceSlug = "patient" | "praticien";
 export type UserType = "patient" | "practitioner" | "coordinator";
 
-export const SPACES: Record<SpaceSlug, { userType: UserType; home: string; login: string; label: string }> = {
-  patient: { userType: "patient", home: "/patient", login: "/connexion/patient", label: "Espace coureur" },
-  praticien: { userType: "practitioner", home: "/praticien", login: "/connexion/praticien", label: "Espace praticiens partenaires" },
-  coordination: { userType: "coordinator", home: "/coordination", login: "/connexion/coordination", label: "Espace coordination Via Sana" },
+export const SPACES: Record<SpaceSlug, { userTypes: UserType[]; login: string; label: string }> = {
+  patient: { userTypes: ["patient"], login: "/connexion/patient", label: "Espace coureur" },
+  praticien: { userTypes: ["practitioner", "coordinator"], login: "/connexion/praticien", label: "Espace praticiens partenaires et coordination" },
 };
 
 export const isSpace = (value: string): value is SpaceSlug => value in SPACES;
@@ -17,5 +17,5 @@ export const HOME: Record<UserType, string> = { patient: "/patient", practitione
 export const LOGIN: Record<UserType, string> = {
   patient: SPACES.patient.login,
   practitioner: SPACES.praticien.login,
-  coordinator: SPACES.coordination.login,
+  coordinator: SPACES.praticien.login,
 };
