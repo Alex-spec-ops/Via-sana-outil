@@ -199,13 +199,16 @@ CREATE TABLE IF NOT EXISTS access_logs (
   at TEXT NOT NULL
 );
 
--- One login per person (patient, practitioner or coordinator). Passwords are
--- only stored as scrypt hashes (CNIL recommendation 2022-100, § 3.3).
+-- One login per person (patient, practitioner or coordinator). The password and
+-- the email code are checked by Supabase Auth (auth_user_id); password_hash is
+-- the former local scrypt hash, kept nullable for older rows.
 CREATE TABLE IF NOT EXISTS credentials (
   email TEXT PRIMARY KEY,
   user_type TEXT NOT NULL CHECK (user_type IN ('patient','practitioner','coordinator')),
   user_id TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
+  password_hash TEXT,
+  auth_user_id TEXT,
+  demo INTEGER NOT NULL DEFAULT 0,
   failed_count INTEGER NOT NULL DEFAULT 0,
   locked_until TEXT,
   password_changed_at TEXT NOT NULL,
@@ -271,6 +274,20 @@ BEGIN
     REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
   END IF;
 END $$;
+`;
+
+/**
+ * Additive, idempotent changes run at every start, so an older deployment
+ * sharing the same database keeps working (no rebuild).
+ */
+export const MIGRATIONS = `
+ALTER TABLE credentials ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS auth_user_id TEXT;
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS demo INTEGER NOT NULL DEFAULT 0;
+-- Seeded accounts have short ids (pa-lea, pr-petit…), sign-ups a UUID.
+UPDATE credentials SET demo = 1 WHERE demo = 0 AND user_id NOT LIKE '%-%-%-%-%-%';
+-- Passwords now live in Supabase Auth only: drop the former local hashes (data minimisation).
+UPDATE credentials SET password_hash = NULL WHERE auth_user_id IS NOT NULL AND password_hash IS NOT NULL;
 `;
 
 /** Every table, children first — used to wipe the demo data. */

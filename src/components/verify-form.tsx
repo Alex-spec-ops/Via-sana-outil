@@ -27,11 +27,11 @@ export function VerifyForm({ demoCode }: { demoCode: string | null }) {
         {state.error && <Notice tone="danger">{state.error}</Notice>}
         {state.info && <Notice tone="done">{state.info}</Notice>}
         <div>
-          <label className="label" htmlFor="code">Code à 6 chiffres</label>
+          <label className="label" htmlFor="code">Code reçu par email</label>
           <input
-            id="code" name="code" ref={input} required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7}
+            id="code" name="code" ref={input} required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,12}" maxLength={12}
             value={code} onChange={(e) => setCode(e.target.value)} autoFocus
-            className="input text-center font-display text-3xl tracking-[0.4em]" placeholder="••••••"
+            className="input text-center font-display text-3xl tracking-[0.3em]" placeholder="••••••••"
           />
         </div>
         <SubmitButton name="intent" value="verify" className="w-full py-3 text-base" pendingLabel="Vérification…">Valider le code</SubmitButton>

@@ -6,10 +6,11 @@ import { get } from "./db";
 import type { Profession } from "./domain";
 import { LOGIN } from "./spaces";
 
-// Authentication in two factors: email + password (passwords.ts), then a
-// single-use code (mfa.ts); only then an HMAC-signed, httpOnly session cookie.
-// In production the code goes out by email or SMS, and practitioners use Pro
-// Santé Connect / e-CPS — the authorisation layer in queries.ts stays the same.
+// Authentication in two factors, both checked by Supabase Auth
+// (supabase-auth.ts): the password, then a code sent by email. Only then does
+// the app open its own HMAC-signed, httpOnly session cookie. In production,
+// practitioners would use Pro Santé Connect / e-CPS — the authorisation layer
+// in queries.ts stays the same.
 
 export const SESSION_COOKIE = "vs_session";
 const MAX_AGE_SECONDS = 60 * 60 * 8;

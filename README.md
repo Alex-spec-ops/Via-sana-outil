@@ -28,6 +28,8 @@ npm install
 npm run dev
 ```
 
+Variables d'environnement (`.env.local`, jamais versionné) : `DATABASE_URL` (base Supabase), `SESSION_SECRET`, et la clé secrète Supabase (`SUPABASE_SECRET_KEY` ou `SECRET_KEY_SUPABASE`) pour l'authentification. Dans Supabase, le modèle d'email « Magic Link » doit contenir `{{ .Token }}` pour envoyer un code plutôt qu'un lien.
+
 Ouvrir http://localhost:3000 : la page d'accueil propose deux entrées.
 - « Commencer mon bilan » : inscription d'un nouveau client, qui arrive ensuite sur son questionnaire.
 - « Se connecter » : `/connexion` propose trois espaces, chacun avec sa page de connexion (email et mot de passe) :
@@ -37,7 +39,7 @@ Ouvrir http://localhost:3000 : la page d'accueil propose deux entrées.
 
   Chaque page n'accepte que les comptes de son espace : un compte d'un autre espace reçoit le même message d'erreur qu'un mot de passe faux, sans révéler qu'il existe. Chaque page liste ses comptes fictifs (un clic remplit le formulaire), avec le mot de passe de démonstration commun `Demo-ViaSana-2026`.
 
-  **Double authentification** : après le mot de passe, un code à 6 chiffres est envoyé à l'adresse du compte (page `/connexion/verification`). Il est valable 10 minutes, utilisable une fois, refusé après 5 erreurs, et il peut être renvoyé 3 fois. La session ne s'ouvre qu'après le code. Les adresses étant fictives, une « boîte mail de démonstration » affiche le message envoyé (table `demo_outbox`, vidée dès le code utilisé) ; en production, un service d'email ou de SMS le remplacerait.
+  **Double authentification par email, gérée par Supabase Auth** : Supabase vérifie le mot de passe, puis envoie un code par email à l'adresse du compte et le vérifie (page `/connexion/verification`). La session de l'application ne s'ouvre qu'après le code. L'application garde ses propres règles : 10 minutes, 5 essais (puis échec compté sur le compte), 3 renvois, chaque étape inscrite au journal. Les comptes de démonstration ont des adresses fictives : aucun email ne leur est envoyé, Supabase génère leur code sans l'envoyer et une « boîte mail de démonstration » l'affiche (Supabase le vérifie quand même).
 
 Les données fictives sont créées automatiquement au premier lancement. Le bouton « Réinitialiser les données de démo » (page `/connexion`) remet tout à zéro.
 
@@ -90,7 +92,7 @@ L'analyse complète, avec les liens Légifrance, est dans [`docs/brief-et-cadre-
 | Strictement nécessaire | CSP L1110-4 II-III | Chaque section du questionnaire déclare ses destinataires parmi les 8 professions et la coordination (`src/lib/domain.ts`). |
 | Opposition au partage | CSP L1110-4 IV | Chaque praticien ne voit plus que ses propres notes et comptes rendus. |
 | Partage hors équipe | CSP L1110-4 III | Case de consentement obligatoire, lien à jeton révocable, chaque ouverture inscrite au journal du patient. |
-| Mots de passe | CNIL délibération 2022-100 | Hachage scrypt avec un sel aléatoire de 128 bits par compte (jamais en clair) ; au moins 14 caractères (ou 12 avec un caractère spécial) mêlant majuscules, minuscules et chiffres ; message d'erreur unique ; compte suspendu 15 min après 5 échecs ; journal `auth_logs` sans mot de passe ni identifiant inconnu. **Double authentification** : code à usage unique de 6 chiffres (10 min, 5 essais), dont seul un HMAC est stocké. |
+| Mots de passe et double authentification | CNIL délibération 2022-100 | Mots de passe stockés et vérifiés par Supabase Auth (jamais par l'application, jamais en clair) ; au moins 14 caractères (ou 12 avec un caractère spécial) mêlant majuscules, minuscules et chiffres ; message d'erreur unique ; compte suspendu 15 min après 5 échecs ; journal `auth_logs` sans mot de passe ni identifiant inconnu. **Double authentification** : code envoyé par email par Supabase, vérifié par Supabase. |
 | Cloisonnement et journalisation exploitée | CNIL SAN-2026-009 | Table `access_logs` (accès autorisés et refusés, praticiens, coordination, destinataires externes), visible par le patient. |
 | Pas de mise en cache de données de santé | RGPD art. 32 | Rendu 100 % dynamique, `Cache-Control: no-store`, `noindex`, `X-Frame-Options: DENY`. |
 
@@ -159,7 +161,7 @@ Avant de commencer : « Réinitialiser les données de démo » sur `/connexion`
 
 ## Limites et suites
 
-- **Authentification :** email, mot de passe (CNIL 2022-100) et code à usage unique (double authentification). En production : envoyer le code par un vrai service d'email ou de SMS, passer les praticiens sur Pro Santé Connect / e-CPS, supprimer le mot de passe de démonstration commun et ajouter la réinitialisation par email. L'inscription ouvre encore la session sans code : la vérification de l'adresse email serait à ajouter.
+- **Authentification :** mot de passe et code par email, gérés par Supabase Auth. Sans fournisseur d'email branché dans Supabase (SMTP), son expéditeur intégré n'écrit qu'aux membres du projet Supabase et quelques fois par heure : à brancher pour de vrais coureurs. En production : passer les praticiens sur Pro Santé Connect / e-CPS, supprimer le mot de passe de démonstration commun et ajouter la réinitialisation du mot de passe. L'inscription ouvre encore la session sans code : la vérification de l'adresse email serait à ajouter.
 - **Paiement non intégré :** l'offre à 150 € est seulement affichée ; pas de vrai rendez-vous en ligne non plus.
 - **Base de démo éphémère :** elle est recréée sur Vercel. En production : PostgreSQL chez un hébergeur HDS.
 - **Pistes :**

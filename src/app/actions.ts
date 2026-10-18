@@ -9,8 +9,11 @@ import { BILAN_DIMENSIONS, COORDINATION_OFFER, INTAKE_SECTIONS, needsMedicalOpin
 import { addCatalogStep, advance, completeStep, instantiatePhase, skipStep } from "@/lib/pathway";
 import { isInCareTeam, logAccess } from "@/lib/queries";
 import { SPACES, isSpace, type SpaceSlug } from "@/lib/spaces";
-import { MAX_CODE_ATTEMPTS, closeChallenge, codeMatches, currentChallenge, recordWrongCode, resendCode, startChallenge } from "@/lib/mfa";
-import { PASSWORD_MAX_LENGTH, dummyPasswordHash, hashPassword, passwordProblem, verifyPassword } from "@/lib/passwords";
+import { PASSWORD_MAX_LENGTH, passwordProblem } from "@/lib/passwords";
+import {
+  MAX_CODE_ATTEMPTS, checkPassword, createAuthUser, currentStep, endStep, recordWrongCode, resendCode, startEmailStep,
+  supabaseAuthReady, syncAuthUsers, verifyCode,
+} from "@/lib/supabase-auth";
 
 function text(formData: FormData, key: string, max = 2000) {
   const value = formData.get(key);
@@ -42,10 +45,19 @@ const STEP_SELECT = "SELECT id, enrollment_id, profession, title, status, option
 export type LoginState = { error: string | null };
 
 const LOGIN_ERROR = "Email ou mot de passe incorrect.";
+const UNAVAILABLE = "Connexion momentanément indisponible. Réessayez dans un instant.";
 const MAX_FAILURES = 5;
 const LOCK_MINUTES = 15;
 
-type CredentialRow = { email: string; user_type: "patient" | "practitioner" | "coordinator"; user_id: string; password_hash: string; failed_count: number; locked_until: string | null };
+type CredentialRow = {
+  email: string;
+  user_type: "patient" | "practitioner" | "coordinator";
+  user_id: string;
+  auth_user_id: string | null;
+  demo: number;
+  failed_count: number;
+  locked_until: string | null;
+};
 
 async function authLog(userType: string, userId: string, event: string) {
   await run("INSERT INTO auth_logs (user_type, user_id, event, at) VALUES (?, ?, ?, ?)", userType, userId, event, new Date().toISOString());
@@ -64,42 +76,57 @@ async function homeFor(type: CredentialRow["user_type"], id: string) {
 }
 
 /**
- * Email + password login (CNIL recommendation 2022-100): one generic error
- * message whatever went wrong, the same work done for an unknown email, and the
- * account suspended for 15 minutes after 5 failed attempts in a row. Neither the
- * password nor an unknown email is ever written to the logs.
+ * Login, first factor. Supabase Auth checks the password; the app keeps its
+ * own rules (CNIL recommendation 2022-100): one generic error message, each
+ * space only accepts its own accounts, the account is suspended for 15 minutes
+ * after 5 failures in a row, and neither the password nor an unknown email is
+ * written to the logs. A right password only starts the email step.
  */
 export async function loginWithPassword(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = text(formData, "email", 120).toLowerCase();
   const raw = formData.get("password");
   const password = typeof raw === "string" ? raw.slice(0, PASSWORD_MAX_LENGTH) : "";
   if (!email || !password) return { error: LOGIN_ERROR };
+  if (!supabaseAuthReady()) return { error: UNAVAILABLE };
 
-  // Each login page only accepts its own kind of account. A wrong space is
-  // answered exactly like an unknown email: same message, same work.
+  // A wrong space is answered exactly like an unknown email: same message, same work.
   const space = text(formData, "space", 20);
   const expected = isSpace(space) ? SPACES[space].userType : null;
-  const credential = await get<CredentialRow>("SELECT * FROM credentials WHERE email = ?", email);
+  let credential = await get<CredentialRow>("SELECT * FROM credentials WHERE email = ?", email);
   if (!credential || credential.user_type !== expected) {
-    await verifyPassword(password, await dummyPasswordHash());
+    await checkPassword(email, password).catch(() => false);
     return { error: LOGIN_ERROR };
   }
-  const locked = credential.locked_until !== null && credential.locked_until > new Date().toISOString();
-  const valid = await verifyPassword(password, credential.password_hash);
-  if (locked) return { error: LOGIN_ERROR };
+  if (credential.locked_until !== null && credential.locked_until > new Date().toISOString()) return { error: LOGIN_ERROR };
+  if (!credential.auth_user_id) {
+    // First login since the demo data was created or reset: create the Supabase users.
+    await syncAuthUsers();
+    credential = (await get<CredentialRow>("SELECT * FROM credentials WHERE email = ?", email))!;
+  }
+
+  let valid: boolean;
+  try {
+    valid = await checkPassword(email, password);
+  } catch {
+    return { error: UNAVAILABLE };
+  }
   if (!valid) {
     await registerFailure(credential);
     return { error: LOGIN_ERROR };
   }
 
-  // Right password: second factor. No session until the code is entered.
-  await startChallenge(credential, space as SpaceSlug);
+  // Right password: second factor by email. No session until the code is entered.
+  try {
+    await startEmailStep({ email, userType: credential.user_type, userId: credential.user_id, space: space as SpaceSlug, demo: credential.demo === 1 });
+  } catch {
+    return { error: "Le code n'a pas pu être envoyé. Réessayez dans une minute." };
+  }
   await authLog(credential.user_type, credential.user_id, "code_envoye");
   redirect("/connexion/verification");
 }
 
 /** One more failure on the account; the 5th in a row suspends it for 15 minutes. */
-async function registerFailure(credential: CredentialRow) {
+async function registerFailure(credential: Pick<CredentialRow, "email" | "user_type" | "user_id" | "failed_count" | "locked_until">) {
   const failures = credential.failed_count + 1;
   const lockUntil = failures >= MAX_FAILURES ? new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString() : null;
   await run(
@@ -112,60 +139,63 @@ async function registerFailure(credential: CredentialRow) {
 export type VerifyState = { error: string | null; info: string | null; expired?: boolean };
 
 /**
- * Second step of the login: checks the single-use code, or sends a new one.
- * Five wrong codes end the step and count as a failure on the account.
+ * Login, second factor: Supabase checks the code received by email, or sends a
+ * new one. Five wrong codes end the step and count as a failure on the account.
  */
 export async function verifyLoginCode(_prev: VerifyState, formData: FormData): Promise<VerifyState> {
-  const challenge = await currentChallenge();
-  if (!challenge) return { error: "Ce code a expiré. Reconnectez-vous pour en recevoir un nouveau.", info: null, expired: true };
+  const step = await currentStep();
+  if (!step) return { error: "Ce code a expiré. Reconnectez-vous pour en recevoir un nouveau.", info: null, expired: true };
 
   if (text(formData, "intent", 10) === "resend") {
-    const sent = await resendCode(challenge);
-    if (sent) {
-      await authLog(challenge.user_type, challenge.user_id, "code_envoye");
-      refresh(); // the demo mailbox shows the new message
+    let sent = false;
+    try {
+      sent = await resendCode(step);
+    } catch {
+      return { error: "Le nouveau code n'a pas pu être envoyé. Patientez une minute avant de réessayer.", info: null };
     }
-    return sent
-      ? { error: null, info: "Un nouveau code vient d'être envoyé. L'ancien ne fonctionne plus." }
-      : { error: "Vous avez déjà demandé 3 nouveaux codes. Reconnectez-vous.", info: null };
+    if (!sent) return { error: "Vous avez déjà demandé 3 nouveaux codes. Reconnectez-vous.", info: null };
+    await authLog(step.userType, step.userId, "code_envoye");
+    refresh(); // the demo mailbox shows the new message
+    return { error: null, info: "Un nouveau code vient d'être envoyé. L'ancien ne fonctionne plus." };
   }
 
   const code = text(formData, "code", 20).replace(/\D/g, "");
-  if (code.length !== 6 || !codeMatches(challenge, code)) {
-    const attempts = await recordWrongCode(challenge);
-    await authLog(challenge.user_type, challenge.user_id, "code_refuse");
+  // Supabase codes are 6 to 10 digits long, depending on the project setting.
+  if (code.length < 6 || code.length > 10 || !(await verifyCode(step, code))) {
+    const attempts = await recordWrongCode(step);
+    await authLog(step.userType, step.userId, "code_refuse");
     if (attempts >= MAX_CODE_ATTEMPTS) {
-      await closeChallenge(challenge.id);
-      const credential = await get<CredentialRow>("SELECT * FROM credentials WHERE user_id = ? AND user_type = ?", challenge.user_id, challenge.user_type);
+      await endStep(step);
+      const credential = await get<CredentialRow>("SELECT * FROM credentials WHERE email = ?", step.email);
       if (credential) await registerFailure(credential);
       return { error: "Trop de codes incorrects. Reconnectez-vous.", info: null, expired: true };
     }
     const left = MAX_CODE_ATTEMPTS - attempts;
-    return { error: `Code incorrect. Il vous reste ${left} essai${left > 1 ? "s" : ""}.`, info: null };
+    return { error: `Code incorrect ou expiré. Il vous reste ${left} essai${left > 1 ? "s" : ""}.`, info: null };
   }
 
-  await closeChallenge(challenge.id);
-  await run("UPDATE credentials SET failed_count = 0, locked_until = NULL WHERE user_id = ? AND user_type = ?", challenge.user_id, challenge.user_type);
-  await authLog(challenge.user_type, challenge.user_id, "connexion");
-  await startSession({ type: challenge.user_type, id: challenge.user_id });
-  if (challenge.user_type === "patient") await logAccess("patient", challenge.user_id, challenge.user_id, "connexion");
-  redirect(await homeFor(challenge.user_type, challenge.user_id));
+  await endStep(step);
+  await run("UPDATE credentials SET failed_count = 0, locked_until = NULL WHERE email = ?", step.email);
+  await authLog(step.userType, step.userId, "connexion");
+  await startSession({ type: step.userType, id: step.userId });
+  if (step.userType === "patient") await logAccess("patient", step.userId, step.userId, "connexion");
+  redirect(await homeFor(step.userType, step.userId));
 }
 
 /** Leaves the second step and goes back to the space's login page. */
 export async function cancelLoginCode() {
-  const challenge = await currentChallenge();
-  if (challenge) await closeChallenge(challenge.id);
-  redirect(challenge ? SPACES[challenge.space].login : "/connexion");
+  const step = await currentStep();
+  await endStep(step);
+  redirect(step ? SPACES[step.space].login : "/connexion");
 }
 
 export type SignupState = { error: string | null; values: Record<string, string> };
 
 /**
  * A new client starts their "bilan de course" from the landing page: the
- * account (with its password), the enrolment and the bilan steps are created,
- * the partner physio who runs the bilans is attached as referent, and the
- * client lands on the questionnaire.
+ * account (its password goes to Supabase Auth), the enrolment and the bilan
+ * steps are created, the partner physio who runs the bilans is attached as
+ * referent, and the client lands on the questionnaire.
  */
 export async function startBilan(_prev: SignupState, formData: FormData): Promise<SignupState> {
   const first = text(formData, "first_name", 60);
@@ -192,6 +222,7 @@ export async function startBilan(_prev: SignupState, formData: FormData): Promis
   if (await get("SELECT 1 AS ok FROM credentials WHERE email = ?", email)) {
     return fail("Un compte existe déjà avec cet email. Connectez-vous ou utilisez une autre adresse.");
   }
+  if (!supabaseAuthReady()) return fail("Inscription momentanément indisponible. Réessayez plus tard.");
 
   const coordinator = await get<{ id: string }>("SELECT id FROM coordinators ORDER BY id LIMIT 1");
   const physio = await get<{ id: string }>(
@@ -199,7 +230,12 @@ export async function startBilan(_prev: SignupState, formData: FormData): Promis
   );
   if (!coordinator || !physio) return fail("Inscription momentanément indisponible. Réessayez plus tard.");
 
-  const passwordHash = await hashPassword(password);
+  let authUserId: string;
+  try {
+    authUserId = await createAuthUser(email, password);
+  } catch (error) {
+    return fail(error instanceof Error && error.message.startsWith("Un compte") ? error.message : "Inscription momentanément indisponible. Réessayez plus tard.");
+  }
   const now = new Date().toISOString();
   const patientId = `pa-${randomUUID()}`;
   const enrollmentId = `en-${randomUUID()}`;
@@ -209,8 +245,8 @@ export async function startBilan(_prev: SignupState, formData: FormData): Promis
       patientId, first, last, birth, sex, email, phone, now,
     );
     await tx.run(
-      "INSERT INTO credentials (email, user_type, user_id, password_hash, password_changed_at) VALUES (?, 'patient', ?, ?, ?)",
-      email, patientId, passwordHash, now,
+      "INSERT INTO credentials (email, user_type, user_id, auth_user_id, password_changed_at) VALUES (?, 'patient', ?, ?, ?)",
+      email, patientId, authUserId, now,
     );
     await tx.run(
       `INSERT INTO enrollments (id, patient_id, pathway_id, coordinator_id, offer, status, start_date, goal_title, goal_detail)
@@ -239,6 +275,8 @@ export async function logout() {
 export async function resetDemo() {
   // Demo-only convenience: there is nothing but fictional data in this database.
   await resetDemoData();
+  // Supabase users of accounts created during the demo are removed, demo passwords restored.
+  await syncAuthUsers().catch(() => {});
   await endSession();
   refresh();
   redirect("/connexion");

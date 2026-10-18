@@ -1,6 +1,6 @@
 import "server-only";
 import path from "node:path";
-import { SCHEMA, TABLES_CHILD_FIRST } from "./schema";
+import { MIGRATIONS, SCHEMA, TABLES_CHILD_FIRST } from "./schema";
 import { seed } from "./seed";
 
 // PostgreSQL, two engines behind one small interface:
@@ -126,6 +126,7 @@ async function open(): Promise<Engine> {
       SCHEMA_VERSION,
     );
   }
+  await engine.exec(MIGRATIONS);
   const count = await engine.get<{ n: number }>("SELECT COUNT(*) AS n FROM coordinators");
   if (!count?.n) await engine.transaction((tx) => seed(tx));
   return engine;

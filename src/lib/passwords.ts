@@ -1,18 +1,8 @@
-import { randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
-
-// Password storage and policy, following the CNIL recommendation n° 2022-100
-// (21 July 2022) on passwords:
-// - never stored in clear: scrypt (slow, memory-hard), a random 128-bit salt per
-//   account, cost parameters stored with the hash (§ 3.3);
-// - "case n° 1" strength (≥ 80 bits of entropy): ≥ 14 characters with upper and
-//   lower case letters and digits, or ≥ 12 characters adding a special character;
-//   common passwords refused; maximum length ≥ 50 (§ 3.2);
-// - plus a restriction after failed attempts (see actions.ts: 5 failures → 15 min).
-
-const scrypt = promisify(scryptCb) as (password: string, salt: Buffer, keylen: number, options: object) => Promise<Buffer>;
-const PARAMS = { N: 16384, r: 8, p: 1 };
-const KEY_LENGTH = 64;
+// Password policy, following the CNIL recommendation n° 2022-100 (21 July 2022):
+// "case n° 1" strength (≥ 80 bits of entropy): ≥ 14 characters with upper and
+// lower case letters and digits, or ≥ 12 characters adding a special character;
+// common passwords refused; maximum length ≥ 50. The passwords themselves are
+// stored and checked by Supabase Auth (bcrypt), never by the app.
 
 export const PASSWORD_MAX_LENGTH = 128;
 
@@ -41,30 +31,6 @@ export function passwordProblem(password: string, personal: string[] = []): stri
     return "Évitez d'utiliser votre nom, votre prénom ou votre email dans le mot de passe.";
   }
   return null;
-}
-
-export async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16); // 128 bits
-  const key = await scrypt(password, salt, KEY_LENGTH, PARAMS);
-  return `scrypt$${PARAMS.N}$${PARAMS.r}$${PARAMS.p}$${salt.toString("base64")}$${key.toString("base64")}`;
-}
-
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const [algo, n, r, p, saltB64, keyB64] = stored.split("$");
-  if (algo !== "scrypt" || !saltB64 || !keyB64) return false;
-  const expected = Buffer.from(keyB64, "base64");
-  const actual = await scrypt(password.slice(0, PASSWORD_MAX_LENGTH), Buffer.from(saltB64, "base64"), expected.length, {
-    N: Number(n), r: Number(r), p: Number(p),
-  });
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
-}
-
-// Verifying against this when the email is unknown keeps the response time the
-// same, so timing does not reveal which accounts exist.
-let dummyHash: Promise<string> | null = null;
-export function dummyPasswordHash() {
-  dummyHash ??= hashPassword(randomBytes(24).toString("base64"));
-  return dummyHash;
 }
 
 /** Shared password of the fictional demo accounts — demo only, displayed on the login page. */

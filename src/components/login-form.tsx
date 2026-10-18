@@ -52,7 +52,7 @@ export function LoginForm({ space, accounts, demoPassword }: { space: SpaceSlug;
         </div>
         <SubmitButton className="w-full py-3 text-base" pendingLabel="Connexion…">Se connecter</SubmitButton>
         <p className="text-xs text-muted">
-          Double authentification : un code à 6 chiffres vous est ensuite envoyé. Après 5 essais infructueux, le compte est suspendu 15 minutes.
+          Double authentification : un code vous est ensuite envoyé par email. Après 5 essais infructueux, le compte est suspendu 15 minutes.
         </p>
       </form>
 
