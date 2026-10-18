@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requirePractitioner } from "@/lib/auth";
 import { ENROLLMENT_STATUS_LABEL, OFFER_LABEL, PROFESSION_LABEL } from "@/lib/domain";
 import { age, formatDate } from "@/lib/format";
-import { clinicalAlerts, listPatientsForPractitioner, upcomingSessionsForPractitioner } from "@/lib/queries";
+import { clinicalAlerts, listPathways, listPatientsForPractitioner, upcomingSessionsForPractitioner } from "@/lib/queries";
 import { Badge, Card, EmptyState, EnrollmentStatusBadge, OfferBadge, ProgressBar } from "@/components/ui";
 import { AgendaList } from "@/components/agenda-list";
 import { FilterForm } from "@/components/filter-form";
@@ -12,10 +12,11 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
   const me = await requirePractitioner();
   const params = await searchParams;
   const pick = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : undefined);
-  const filters = { offer: pick("offre"), status: pick("statut"), step: pick("etape"), q: pick("q"), alert: pick("alerte") };
+  const filters = { pathway: pick("parcours"), offer: pick("offre"), status: pick("statut"), step: pick("etape"), q: pick("q"), alert: pick("alerte") };
 
   const everyone = await listPatientsForPractitioner(me.id);
   const patients = await listPatientsForPractitioner(me.id, filters);
+  const pathways = await listPathways();
   const upcoming = await upcomingSessionsForPractitioner(me.id);
   const stepTitles = [...new Set(everyone.map((r) => r.current_step_title).filter(Boolean))] as string[];
   const activeFilters = Object.values(filters).some(Boolean);
@@ -78,8 +79,12 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
         <Card className="min-w-0">
-          <FilterForm className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1.3fr_auto]">
+          <FilterForm className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.2fr_1.1fr_1fr_1fr_1.2fr_auto]">
             <input name="q" defaultValue={filters.q} placeholder="Rechercher un patient…" className="input" aria-label="Rechercher" />
+            <select name="parcours" defaultValue={filters.pathway ?? ""} className="input" aria-label="Parcours">
+              <option value="">Tous les parcours</option>
+              {pathways.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
             <select name="offre" defaultValue={filters.offer ?? ""} className="input" aria-label="Offre">
               <option value="">Toutes les offres</option>
               {Object.entries(OFFER_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -106,7 +111,7 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted uppercase">
                     <th className="px-5 py-2 font-medium">Patient</th>
-                    <th className="px-3 py-2 font-medium">Offre</th>
+                    <th className="px-3 py-2 font-medium">Parcours · offre</th>
                     <th className="px-3 py-2 font-medium">Étape en cours</th>
                     <th className="px-3 py-2 font-medium">Progression</th>
                     <th className="px-3 py-2 font-medium">Prochaine séance</th>
@@ -129,7 +134,10 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pratici
                             </div>
                           )}
                         </td>
-                        <td className="px-3 py-3"><OfferBadge offer={p.offer} /></td>
+                        <td className="px-3 py-3">
+                          <p className="mb-1 text-xs text-muted">{p.pathway_name}</p>
+                          <OfferBadge offer={p.offer} />
+                        </td>
                         <td className="px-3 py-3">
                           {p.current_step_title ? (
                             <>

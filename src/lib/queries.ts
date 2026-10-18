@@ -273,6 +273,8 @@ async function getAccessLogs(patientId: string, limit = 30) {
 
 export type ListRow = {
   enrollment_id: string;
+  pathway_id: string;
+  pathway_name: string;
   patient_id: string;
   first_name: string;
   last_name: string;
@@ -298,7 +300,7 @@ export type ListRow = {
 
 const LIST_COLUMNS = `
   e.id AS enrollment_id, p.id AS patient_id, p.first_name, p.last_name, p.birth_date, e.offer, e.status, e.goal_title,
-  e.goal_date, e.coordinated_until, e.start_date,
+  e.goal_date, e.coordinated_until, e.start_date, e.pathway_id, pw.name AS pathway_name,
   cur.id AS current_step_id, cur.title AS current_step_title, cur.profession AS current_step_profession,
   (SELECT COUNT(*) FROM sessions s WHERE s.enrollment_step_id = cur.id AND s.status = 'prevue') AS current_step_has_session,
   (SELECT COUNT(*) FROM enrollment_steps es WHERE es.enrollment_id = e.id AND es.status = 'realisee') AS done_steps,
@@ -312,13 +314,15 @@ const LIST_COLUMNS = `
 
 const LIST_JOINS = `
   JOIN patients p ON p.id = e.patient_id
+  JOIN pathways pw ON pw.id = e.pathway_id
   LEFT JOIN enrollment_steps cur ON cur.enrollment_id = e.id AND cur.status = 'en_cours'`;
 
-export type ListFilters = { offer?: string; status?: string; step?: string; q?: string; alert?: string };
+export type ListFilters = { pathway?: string; offer?: string; status?: string; step?: string; q?: string; alert?: string };
 
 function applyFilters<T extends ListRow>(rows: T[], filters: ListFilters, alerts: (r: T) => string[]) {
   const q = filters.q?.trim().toLowerCase();
   return rows.filter((r) => {
+    if (filters.pathway && r.pathway_id !== filters.pathway) return false;
     if (filters.offer && r.offer !== filters.offer) return false;
     if (filters.status && r.status !== filters.status) return false;
     if (filters.step && r.current_step_title !== filters.step) return false;
@@ -326,6 +330,11 @@ function applyFilters<T extends ListRow>(rows: T[], filters: ListFilters, alerts
     if (q && !`${r.first_name} ${r.last_name} ${r.goal_title}`.toLowerCase().includes(q)) return false;
     return true;
   });
+}
+
+/** The pathways (care programmes) on offer, for the list filters. */
+export async function listPathways() {
+  return await all<{ id: string; name: string }>("SELECT id, name FROM pathways ORDER BY name");
 }
 
 const STATUS_ORDER = "CASE e.status WHEN 'actif' THEN 0 WHEN 'en_pause' THEN 1 ELSE 2 END, p.last_name";
