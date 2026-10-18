@@ -1,7 +1,7 @@
 import "server-only";
 import path from "node:path";
 import { MIGRATIONS, SCHEMA, TABLES_CHILD_FIRST } from "./schema";
-import { seed } from "./seed";
+import { ensureTrail, seed } from "./seed";
 
 // PostgreSQL, two engines behind one small interface:
 // - DATABASE_URL set  → a Supabase (or any PostgreSQL) database, reached from the
@@ -129,6 +129,7 @@ async function open(): Promise<Engine> {
   await engine.exec(MIGRATIONS);
   const count = await engine.get<{ n: number }>("SELECT COUNT(*) AS n FROM coordinators");
   if (!count?.n) await engine.transaction((tx) => seed(tx));
+  else if (!(await engine.get("SELECT 1 AS ok FROM pathways WHERE id = 'pw-trail'"))) await engine.transaction((tx) => ensureTrail(tx));
   return engine;
 }
 

@@ -41,13 +41,13 @@ Ouvrir http://localhost:3000 : la page d'accueil propose deux entrées.
 
   **Double authentification par email, gérée par Supabase Auth** : Supabase vérifie le mot de passe, puis envoie un code par email à l'adresse du compte et le vérifie (page `/connexion/verification`). La session de l'application ne s'ouvre qu'après le code. L'application garde ses propres règles : 10 minutes, 5 essais (puis échec compté sur le compte), 3 renvois, chaque étape inscrite au journal. Les comptes de démonstration ont des adresses fictives : aucun email ne leur est envoyé, Supabase génère leur code sans l'envoyer et une « boîte mail de démonstration » l'affiche (Supabase le vérifie quand même).
 
-Les données fictives sont créées automatiquement au premier lancement. Le bouton « Réinitialiser les données de démo » (page `/connexion`) remet tout à zéro.
+Les données fictives sont créées automatiquement au premier lancement. Le bouton « Réinitialiser les données de démo » (page `/connexion`) remet tout à zéro. Elles couvrent deux parcours : PrépaMarathon (9 coureurs, dont le compte du jury) et Prépa Trail (Emma Rousseau en parcours coordonné, Yanis Mercier en bilan avec Julien Petit), pour montrer le filtre par parcours. Une base créée avant l'ajout de Prépa Trail le reçoit automatiquement au démarrage, sans remise à zéro.
 
 ## Trois rôles
 
 **Coordination Via Sana** (`/coordination`)
 - Une file **« À traiter »** en tête du tableau de bord, calculée à partir des données logistiques et triée par urgence : questionnaire non envoyé (J+x), séance à planifier, plan d'action à remettre, choix de la suite en attente, équipe en attente de validation, fin de coordination proche. Chaque ligne ouvre le dossier sur la bonne section (relances, parcours).
-- Tous les parcours, avec filtres appliqués dès le choix, et l'agenda du réseau groupé par jour (Aujourd'hui, Demain…).
+- Tous les parcours, avec filtres (parcours, offre, statut, étape) appliqués dès le choix, et l'agenda du réseau groupé par jour (Aujourd'hui, Demain…).
 - En tête de chaque dossier : « À faire pour ce parcours », téléphone et email cliquables, menu de sections.
 - Sur chaque parcours :
   - proposer un praticien du réseau ;
@@ -61,7 +61,7 @@ Les données fictives sont créées automatiquement au premier lancement. Le bou
 **Praticiens partenaires** (`/praticien`)
 - Uniquement les patients qui les ont acceptés dans leur équipe.
 - Une file **« À traiter »** : douleur déclarée ≥ 5/10, compte rendu à remettre, étape de leur profession en cours. Ces signaux cliniques ne sont jamais montrés à la coordination.
-- Filtres par offre, statut et étape ; vue « À surveiller » ; agenda groupé par jour.
+- Filtres par parcours, offre, statut et étape ; vue « À surveiller » ; agenda groupé par jour.
 - En tête de la fiche patient, un bandeau **« À retenir »** : points d'attention du questionnaire (limités aux sections de leur profession), dernier suivi déclaré, prochaine séance, état du compte rendu. Un menu de sections reste visible pendant le défilement.
 - La fiche patient regroupe :
   - les étapes ;

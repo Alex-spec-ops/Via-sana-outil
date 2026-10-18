@@ -83,6 +83,8 @@ type PatientDef = {
   last: string;
   birth: string;
   sex: "F" | "M" | "X";
+  /** Pathway, when it is not PrépaMarathon */
+  pathway?: string;
   /** Login email when it is not firstname.lastname@exemple.fr */
   email?: string;
   offer: "bilan" | "parcours";
@@ -268,6 +270,55 @@ const PATIENTS: PatientDef[] = [
   },
 ];
 
+// Second fictional pathway, so the dashboards' pathway filter has something to
+// sort. Same bilan phase (the app keys on those step titles), trail-specific
+// coordinated phase.
+const TRAIL = {
+  id: "pw-trail",
+  name: "Prépa Trail",
+  description:
+    "Un bilan de course orienté trail (dénivelé, descentes, terrain), puis, si le coureur le souhaite, un parcours coordonné de 4 mois jusqu'à la course.",
+  steps: [
+    { phase: "bilan", title: "Questionnaire en ligne", description: "5 minutes : historique de course, dénivelé habituel, objectif, gênes. Le kiné le lit avant le bilan.", profession: "patient", week: 0, optional: 0 },
+    { phase: "bilan", title: "Téléconsultation médecin", description: "Avis médical avant le bilan, et ordonnance si le coureur n'en a pas.", profession: "medecin", week: 0, optional: 1 },
+    { phase: "bilan", title: "Bilan de course (30 min)", description: "Antécédents, volume et dénivelé, stabilité des chevilles, force excentrique pour les descentes.", profession: "kine", week: 1, optional: 0 },
+    { phase: "bilan", title: "Plan d'action remis", description: "Compte rendu PDF : observations du kiné et recommandations.", profession: "kine", week: 1, optional: 0 },
+    { phase: "bilan", title: "Choix de la suite", description: "S'arrêter au bilan, ou poursuivre avec le parcours coordonné.", profession: "patient", week: 2, optional: 0 },
+    { phase: "parcours", title: "Analyse de foulée en descente", description: "Placement, freinage, appuis sur terrain pentu, filmés en mouvement.", profession: "kine", week: 3, optional: 1 },
+    { phase: "parcours", title: "Composition de l'équipe", description: "Selon les besoins du bilan, le coordinateur propose les praticiens ; le coureur valide.", profession: "coordinateur", week: 3, optional: 0 },
+    { phase: "parcours", title: "Bilan de fin de parcours", description: "Débrief de la course, récupération, suites à donner.", profession: "kine", week: 18, optional: 0 },
+  ],
+};
+
+const TRAIL_PATIENTS: PatientDef[] = [
+  {
+    id: "pa-emma", first: "Emma", last: "Rousseau", birth: "1987-07-21", sex: "F", pathway: TRAIL.id, offer: "parcours", status: "actif", startDaysAgo: 42,
+    team: [{ id: "pr-roux" }, { id: "pr-nguyen" }, { id: "pr-lefevre" }],
+    added: [["cat-podo", 4], ["cat-diet", 5], ["cat-kine-renfo", 7], ["cat-diet-course", 10]],
+    states: "RNRRRRRRREAA", report: true,
+    goal: { title: "Finir un trail de 45 km", detail: "Premier trail long, 1 200 m de dénivelé positif", raceInWeeks: 12 },
+    intake: {
+      ordonnance: true, medecin_traitant: "Dr Vasseur", disponibilites: "Week-end", course: "Trail 45 km (1 200 m D+)", temps_vise: "5h30",
+      niveau: "Intermédiaire (1–3 ans)", km_semaine: 30, seances_semaine: 3, deja_marathon: false, programme: "Club de trail",
+      antecedents: "RAS", cardio: false, traitements: "Aucun", blessures: "Entorse cheville gauche (2024)", douleur_actuelle: 1,
+      zone_douleur: "Cheville gauche", chaussures: "Trail, drop 8 mm", semelles: false, surface: "Trail", poids: 60, taille: 167,
+      regime: "Omnivore", troubles_digestifs: true, sommeil: 7, stress: 4, attentes: "Tenir les descentes sans me tordre la cheville",
+    },
+  },
+  {
+    id: "pa-yanis", first: "Yanis", last: "Mercier", birth: "1994-10-02", sex: "M", pathway: TRAIL.id, offer: "bilan", status: "actif", startDaysAgo: 5,
+    team: [{ id: "pr-petit" }], states: "RNEAA",
+    goal: { title: "Trail de 30 km en moins de 3h30", detail: "Passage de la route au trail", raceInWeeks: 16 },
+    intake: {
+      ordonnance: true, medecin_traitant: "Dr Caron", disponibilites: "En semaine, soir", course: "Trail 30 km (800 m D+)", temps_vise: "3h30",
+      niveau: "Confirmé (> 3 ans)", km_semaine: 45, seances_semaine: 4, deja_marathon: true, programme: "Personnel",
+      antecedents: "RAS", cardio: false, traitements: "Aucun", blessures: "Syndrome rotulien genou droit (2025)", douleur_actuelle: 2,
+      zone_douleur: "Genou droit", chaussures: "Route, 600 km", semelles: false, surface: "Mixte", poids: 70, taille: 177,
+      regime: "Omnivore", troubles_digestifs: false, sommeil: 8, stress: 3, attentes: "Préparer mes genoux aux descentes",
+    },
+  },
+];
+
 const REPORTS: Record<string, { findings: Record<string, string>; recommendations: string; plan: string }> = {
   "pa-lea": {
     findings: {
@@ -325,6 +376,16 @@ const REPORTS: Record<string, { findings: Record<string, string>; recommendation
     recommendations: "Transition progressive de chaussures, bilan diététique (apports énergétiques).",
     plan: "Chaussures plus amorties sur les sorties longues\nBilan diététique\nSurveiller toute douleur du pied",
   },
+  "pa-emma": {
+    findings: {
+      antecedents: "Entorse de cheville gauche en 2024, rééducation incomplète.", volume: "30 km/semaine, 600 m de dénivelé.",
+      objectif: "Trail de 45 km : réaliste en 12 semaines avec une montée progressive du dénivelé.",
+      douleurs: "Gêne de cheville gauche en descente technique.", appuis: "Instabilité de la cheville gauche en appui unipodal.",
+      desequilibres: "Quadriceps peu préparés à l'excentrique.",
+    },
+    recommendations: "Proprioception de cheville, renforcement excentrique pour les descentes, bilan podologique et stratégie de ravitaillement.",
+    plan: "Proprioception 10 min, 4 fois par semaine\nDescentes progressives, +100 m D- par semaine\nBilan podologique\nTester les ravitaillements sur les sorties longues",
+  },
   "pa-antoine": {
     findings: {
       antecedents: "Bandelette ilio-tibiale gauche.", volume: "30 km/semaine.", objectif: "Marathon de Lille en 3h45.",
@@ -354,16 +415,131 @@ export async function seed(db: Db) {
     await insPract(p.id, p.first, p.last, p.title, p.profession, p.specialty, p.location, `${ascii(p.first)}.${ascii(p.last)}@partenaire.example`);
   }
 
-  await db.run("INSERT INTO pathways (id, name, description) VALUES (?, ?, ?)", PATHWAY.id, PATHWAY.name, PATHWAY.description);
-  const insStep = stmt(
-    "INSERT INTO pathway_steps (id, pathway_id, phase, position, title, description, profession, optional, week_offset) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-  );
-  for (const [i, s] of PATHWAY.steps.entries()) {
-    await insStep(`${PATHWAY.id}-s${i + 1}`, PATHWAY.id, s.phase, i + 1, s.title, s.description, s.profession, s.optional, s.week);
-  }
+  await insertPathway(db, PATHWAY);
   const insCatalog = stmt("INSERT INTO step_catalog (id, title, description, profession) VALUES (?, ?, ?, ?)");
   for (const c of CATALOG) await insCatalog(c.id, c.title, c.description, c.profession);
 
+  await insertPatients(db, now, PATIENTS, 0);
+
+  // Marc shared his bilan with his usual physiotherapist (outside the care team).
+  await db.run(
+    "INSERT INTO external_shares (id, enrollment_id, report_id, recipient_name, recipient_role, token, consent_at, last_access_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    randomUUID(), "en-marc", "rp-marc", "Pauline Girard", "Kinésithérapeute habituelle", "demo-partage-marc", at(now, -20, 19), at(now, -19, 8, 30),
+  );
+  await db.run(
+    "INSERT INTO access_logs (actor_type, actor_id, patient_id, action, allowed, at) VALUES (?, ?, ?, ?, ?, ?)",
+    "external", "Pauline Girard", "pa-marc", "lecture_partage_externe", 1, at(now, -19, 8, 30),
+  );
+
+  // A first reminder already sent to Hugo for his questionnaire.
+  await db.run(
+    "INSERT INTO relances (id, enrollment_id, coordinator_id, channel, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    randomUUID(), "en-hugo", COORDINATOR.id, "email", "Questionnaire en ligne non rempli", at(now, -1, 10, 0),
+  );
+
+  await insertNotes(db, now, [
+    ["en-lea", "pr-petit", "Foulée sur tapis : attaque talon corrigée partiellement, cadence 162. Poursuivre le travail de cadence.", "equipe", -30],
+    ["en-lea", "pr-petit", "Pensez à vos exercices de gainage après chaque sortie : 3 séries de 30 secondes suffisent.", "patient", -30],
+    ["en-lea", "pr-nguyen", "Pas de semelles nécessaires. Chaussures à changer (450 km).", "equipe", -27],
+    ["en-lea", "pr-lefevre", "Apports glucidiques insuffisants avant les sorties longues. Collation testée : banane + compote 1h avant.", "equipe", -26],
+    ["en-lea", "pr-benali", "Restriction de mobilité cheville droite traitée, possiblement liée à l'ancienne périostite.", "equipe", -12],
+    ["en-lea", "pr-benali", "À revoir si la gêne tibiale réapparaît avec la montée en volume.", "privee", -12],
+    ["en-karim", "pr-roux", "Douleur Achille gauche réapparue après la sortie de 28 km. Volume réduit de 20 % cette semaine.", "equipe", -3],
+    ["en-karim", "pr-morel", "Antécédents cardiaques familiaux : ECG d'effort normal, pas de contre-indication.", "equipe", -40],
+    ["en-karim", "pr-lefevre", "Plan de ravitaillement : 1 gel tous les 7 km à partir du 10e.", "patient", -8],
+    ["en-ines", "pr-morel", "Fracture de fatigue du 2e métatarsien gauche confirmée. Arrêt de la course 6 semaines.", "equipe", -6],
+    ["en-ines", "pr-aubert", "Vit mal l'arrêt forcé. Séances de soutien maintenues pendant la pause.", "equipe", -4],
+    ["en-antoine", "pr-roux", "Travail du moyen fessier priorisé, bonne progression.", "equipe", -8],
+    ["en-antoine", "pr-benali", "Bassin en antéversion, traitement lombo-pelvien.", "equipe", -12],
+  ]);
+
+  await insertCheckins(db, now, [
+    ["en-lea", "pa-lea", [34, 38, 41, 44], [1, 1, 2, 1], [4, 5, 5, 4], "Sortie longue de 22 km, bonnes sensations."],
+    ["en-karim", "pa-karim", [52, 58, 60, 48], [1, 2, 4, 6], [4, 5, 6, 7], "Douleur au talon gauche le matin."],
+    ["en-antoine", "pa-antoine", [24, 26, 30], [3, 2, 2], [3, 3, 3], ""],
+  ]);
+
+  await insertCredentials(db, now);
+  await seedTrail(db, now);
+}
+
+/** Adds the trail pathway to a database seeded before it existed (no reset needed). */
+export async function ensureTrail(db: Db) {
+  if (await db.get("SELECT 1 AS ok FROM pathways WHERE id = ?", TRAIL.id)) return;
+  if (!(await db.get("SELECT 1 AS ok FROM coordinators WHERE id = ?", COORDINATOR.id))) return;
+  await seedTrail(db, Date.now());
+}
+
+async function seedTrail(db: Db, now: number) {
+  await insertPathway(db, TRAIL);
+  await insertPatients(db, now, TRAIL_PATIENTS, PATIENTS.length);
+  await insertNotes(db, now, [
+    ["en-emma", "pr-roux", "Descentes travaillées en excentrique, bonne tolérance du quadriceps. Cheville gauche plus stable.", "equipe", -9],
+    ["en-emma", "pr-nguyen", "Chaussures de trail drop 6 mm conseillées, pas de semelles nécessaires.", "equipe", -20],
+    ["en-emma", "pr-lefevre", "Tester boisson d'effort et compotes sur les sorties de plus de 2h.", "patient", -14],
+  ]);
+  await insertCheckins(db, now, [
+    ["en-emma", "pa-emma", [26, 30, 33, 36], [1, 1, 2, 1], [4, 4, 5, 5], "Sortie de 25 km avec 900 m D+, cheville stable."],
+  ]);
+  await insertCredentials(db, now);
+}
+
+async function insertPathway(db: Db, pathway: typeof PATHWAY) {
+  await db.run("INSERT INTO pathways (id, name, description) VALUES (?, ?, ?)", pathway.id, pathway.name, pathway.description);
+  for (const [i, s] of pathway.steps.entries()) {
+    await db.run(
+      "INSERT INTO pathway_steps (id, pathway_id, phase, position, title, description, profession, optional, week_offset) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      `${pathway.id}-s${i + 1}`, pathway.id, s.phase, i + 1, s.title, s.description, s.profession, s.optional, s.week,
+    );
+  }
+}
+
+async function insertNotes(db: Db, now: number, notes: [string, string, string, "equipe" | "privee" | "patient", number][]) {
+  for (const [enrollmentId, author, body, visibility, days] of notes) {
+    await db.run(
+      "INSERT INTO notes (id, enrollment_id, author_id, body, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      randomUUID(), enrollmentId, author, body, visibility, at(now, days, 17, 30),
+    );
+  }
+}
+
+/** Weekly check-ins (patient self-reports, coordinated pathway only). */
+async function insertCheckins(db: Db, now: number, checkins: [string, string, number[], number[], number[], string][]) {
+  for (const [enrollmentId, patientId, km, pain, fatigue, lastComment] of checkins) {
+    for (const [i, value] of km.entries()) {
+      const weeksAgo = km.length - 1 - i;
+      await db.run(
+        "INSERT INTO checkins (id, enrollment_id, author_type, author_id, date, weekly_km, pain, fatigue, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        randomUUID(), enrollmentId, "patient", patientId, dateOnly(now, -weeksAgo * 7 - 1), value, pain[i], fatigue[i],
+        i === km.length - 1 ? lastComment : "",
+      );
+    }
+  }
+}
+
+/**
+ * One login per demo account that has none yet. Their Supabase Auth users
+ * (shared demo password, shown on the login page) are created by
+ * syncAuthUsers on the first login.
+ */
+async function insertCredentials(db: Db, now: number) {
+  const accounts = await db.all<{ email: string; user_type: string; user_id: string }>(
+    `SELECT email, user_type, user_id FROM (
+       SELECT email, 'coordinator' AS user_type, id AS user_id FROM coordinators
+       UNION ALL SELECT email, 'practitioner', id FROM practitioners
+       UNION ALL SELECT email, 'patient', id FROM patients) a
+     WHERE NOT EXISTS (SELECT 1 FROM credentials c WHERE c.user_id = a.user_id)`,
+  );
+  for (const a of accounts) {
+    await db.run(
+      "INSERT INTO credentials (email, user_type, user_id, demo, password_changed_at) VALUES (?, ?, ?, 1, ?)",
+      a.email.toLowerCase(), a.user_type, a.user_id, new Date(now).toISOString(),
+    );
+  }
+}
+
+async function insertPatients(db: Db, now: number, patients: PatientDef[], firstIndex: number) {
+  const stmt = (sql: string) => (...params: (string | number | null)[]) => db.run(sql, ...params);
   const insPatient = stmt(
     "INSERT INTO patients (id, first_name, last_name, birth_date, sex, email, phone, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
@@ -394,13 +570,14 @@ export async function seed(db: Db) {
   const insLog = stmt("INSERT INTO access_logs (actor_type, actor_id, patient_id, action, allowed, at) VALUES (?, ?, ?, ?, ?, ?)");
   const locationOf = (prId: string) => PRACTITIONERS.find((p) => p.id === prId)?.location ?? "";
 
-  for (const [index, p] of PATIENTS.entries()) {
+  for (const [offset, p] of patients.entries()) {
+    const index = firstIndex + offset;
     const start = now - p.startDaysAgo * DAY;
     const enrollmentId = `en-${p.id.slice(3)}`;
-    await insPatient(p.id, p.first, p.last, p.birth, p.sex, p.email ?? `${ascii(p.first)}.${p.last.toLowerCase()}@exemple.fr`, `06 00 00 0${index} ${10 + index}`, at(start, -1));
+    await insPatient(p.id, p.first, p.last, p.birth, p.sex, p.email ?? `${ascii(p.first)}.${p.last.toLowerCase()}@exemple.fr`, `06 00 00 ${String(index).padStart(2, "0")} ${10 + index}`, at(start, -1));
     await insEnrollment(
-      enrollmentId, p.id, PATHWAY.id, COORDINATOR.id, p.offer, p.status, dateOnly(start, 0),
-      p.offer === "parcours" ? dateOnly(start, 14 + 182) : null,
+      enrollmentId, p.id, p.pathway ?? PATHWAY.id, COORDINATOR.id, p.offer, p.status, dateOnly(start, 0),
+      p.offer === "parcours" ? dateOnly(start, 14 + (p.pathway === TRAIL.id ? 126 : 182)) : null,
       p.goal.title, p.goal.raceInWeeks !== undefined ? dateOnly(now, p.goal.raceInWeeks * 7 - 1) : null,
       p.goal.detail, p.opposed ? 1 : 0, p.opposed ? at(now, -10, 18, 12) : null,
     );
@@ -462,70 +639,5 @@ export async function seed(db: Db) {
 
     await insLog("practitioner", p.team[0].id, p.id, "consultation_fiche", 1, at(now, -2, 9, 40));
     await insLog("coordinator", COORDINATOR.id, p.id, "consultation_logistique", 1, at(now, -1, 11, 5));
-  }
-
-  // Marc shared his bilan with his usual physiotherapist (outside the care team).
-  await db.run(
-    "INSERT INTO external_shares (id, enrollment_id, report_id, recipient_name, recipient_role, token, consent_at, last_access_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    randomUUID(), "en-marc", "rp-marc", "Pauline Girard", "Kinésithérapeute habituelle", "demo-partage-marc", at(now, -20, 19), at(now, -19, 8, 30),
-  );
-  await insLog("external", "Pauline Girard", "pa-marc", "lecture_partage_externe", 1, at(now, -19, 8, 30));
-
-  // A first reminder already sent to Hugo for his questionnaire.
-  await db.run(
-    "INSERT INTO relances (id, enrollment_id, coordinator_id, channel, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-    randomUUID(), "en-hugo", COORDINATOR.id, "email", "Questionnaire en ligne non rempli", at(now, -1, 10, 0),
-  );
-
-  // Follow-up notes
-  const insNote = stmt("INSERT INTO notes (id, enrollment_id, author_id, body, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)");
-  const notes: [string, string, string, "equipe" | "privee" | "patient", number][] = [
-    ["en-lea", "pr-petit", "Foulée sur tapis : attaque talon corrigée partiellement, cadence 162. Poursuivre le travail de cadence.", "equipe", -30],
-    ["en-lea", "pr-petit", "Pensez à vos exercices de gainage après chaque sortie : 3 séries de 30 secondes suffisent.", "patient", -30],
-    ["en-lea", "pr-nguyen", "Pas de semelles nécessaires. Chaussures à changer (450 km).", "equipe", -27],
-    ["en-lea", "pr-lefevre", "Apports glucidiques insuffisants avant les sorties longues. Collation testée : banane + compote 1h avant.", "equipe", -26],
-    ["en-lea", "pr-benali", "Restriction de mobilité cheville droite traitée, possiblement liée à l'ancienne périostite.", "equipe", -12],
-    ["en-lea", "pr-benali", "À revoir si la gêne tibiale réapparaît avec la montée en volume.", "privee", -12],
-    ["en-karim", "pr-roux", "Douleur Achille gauche réapparue après la sortie de 28 km. Volume réduit de 20 % cette semaine.", "equipe", -3],
-    ["en-karim", "pr-morel", "Antécédents cardiaques familiaux : ECG d'effort normal, pas de contre-indication.", "equipe", -40],
-    ["en-karim", "pr-lefevre", "Plan de ravitaillement : 1 gel tous les 7 km à partir du 10e.", "patient", -8],
-    ["en-ines", "pr-morel", "Fracture de fatigue du 2e métatarsien gauche confirmée. Arrêt de la course 6 semaines.", "equipe", -6],
-    ["en-ines", "pr-aubert", "Vit mal l'arrêt forcé. Séances de soutien maintenues pendant la pause.", "equipe", -4],
-    ["en-antoine", "pr-roux", "Travail du moyen fessier priorisé, bonne progression.", "equipe", -8],
-    ["en-antoine", "pr-benali", "Bassin en antéversion, traitement lombo-pelvien.", "equipe", -12],
-  ];
-  for (const [enrollmentId, author, body, visibility, days] of notes) {
-    await insNote(randomUUID(), enrollmentId, author, body, visibility, at(now, days, 17, 30));
-  }
-
-  // Weekly check-ins (patient self-reports, coordinated pathway only)
-  const insCheckin = stmt(
-    "INSERT INTO checkins (id, enrollment_id, author_type, author_id, date, weekly_km, pain, fatigue, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-  );
-  const checkins: [string, string, number[], number[], number[], string][] = [
-    ["en-lea", "pa-lea", [34, 38, 41, 44], [1, 1, 2, 1], [4, 5, 5, 4], "Sortie longue de 22 km, bonnes sensations."],
-    ["en-karim", "pa-karim", [52, 58, 60, 48], [1, 2, 4, 6], [4, 5, 6, 7], "Douleur au talon gauche le matin."],
-    ["en-antoine", "pa-antoine", [24, 26, 30], [3, 2, 2], [3, 3, 3], ""],
-  ];
-  for (const [enrollmentId, patientId, km, pain, fatigue, lastComment] of checkins) {
-    for (const [i, value] of km.entries()) {
-      const weeksAgo = km.length - 1 - i;
-      await insCheckin(randomUUID(), enrollmentId, "patient", patientId, dateOnly(now, -weeksAgo * 7 - 1), value, pain[i], fatigue[i],
-        i === km.length - 1 ? lastComment : "");
-    }
-  }
-
-  // One login per demo account. Their Supabase Auth users (shared demo password,
-  // shown on the login page) are created by syncAuthUsers on the first login.
-  const accounts = await db.all<{ email: string; user_type: string; user_id: string }>(
-    `SELECT email, 'coordinator' AS user_type, id AS user_id FROM coordinators
-     UNION ALL SELECT email, 'practitioner', id FROM practitioners
-     UNION ALL SELECT email, 'patient', id FROM patients`,
-  );
-  const insCredential = stmt(
-    "INSERT INTO credentials (email, user_type, user_id, demo, password_changed_at) VALUES (?, ?, ?, 1, ?)",
-  );
-  for (const a of accounts) {
-    await insCredential(a.email.toLowerCase(), a.user_type, a.user_id, new Date(now).toISOString());
   }
 }
