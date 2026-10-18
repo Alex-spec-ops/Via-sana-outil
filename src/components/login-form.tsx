@@ -52,7 +52,7 @@ export function LoginForm({ space, accounts, demoPassword }: { space: SpaceSlug;
         </div>
         <SubmitButton className="w-full py-3 text-base" pendingLabel="Connexion…">Se connecter</SubmitButton>
         <p className="text-xs text-muted">
-          Après 5 essais infructueux, le compte est suspendu 15 minutes. Le mot de passe n&apos;est jamais stocké en clair.
+          Double authentification : un code à 6 chiffres vous est ensuite envoyé. Après 5 essais infructueux, le compte est suspendu 15 minutes.
         </p>
       </form>
 

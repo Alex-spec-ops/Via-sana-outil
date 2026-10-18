@@ -6,10 +6,10 @@ import { get } from "./db";
 import type { Profession } from "./domain";
 import { LOGIN } from "./spaces";
 
-// Authentication: email + password (see passwords.ts and loginWithPassword in
-// actions.ts), then an HMAC-signed, httpOnly session cookie. In production a
-// second factor is added (Pro Santé Connect / e-CPS for practitioners, 2FA for
-// patients and coordination) — the authorisation layer in queries.ts stays the same.
+// Authentication in two factors: email + password (passwords.ts), then a
+// single-use code (mfa.ts); only then an HMAC-signed, httpOnly session cookie.
+// In production the code goes out by email or SMS, and practitioners use Pro
+// Santé Connect / e-CPS — the authorisation layer in queries.ts stays the same.
 
 export const SESSION_COOKIE = "vs_session";
 const MAX_AGE_SECONDS = 60 * 60 * 8;
@@ -55,6 +55,26 @@ function secret() {
 
 function sign(payload: string) {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
+}
+
+/** HMAC of a value with the session secret (second-factor codes). */
+export function hmac(value: string) {
+  return sign(value);
+}
+
+/** "value.signature" — for short-lived cookies that only carry an identifier. */
+export function signValue(value: string) {
+  return `${value}.${sign(value)}`;
+}
+
+export function verifySignedValue(token: string | undefined) {
+  if (!token) return null;
+  const dot = token.lastIndexOf(".");
+  if (dot < 1) return null;
+  const value = token.slice(0, dot);
+  const expected = Buffer.from(sign(value));
+  const actual = Buffer.from(token.slice(dot + 1));
+  return expected.length === actual.length && timingSafeEqual(expected, actual) ? value : null;
 }
 
 export function encodeSession(session: Session) {

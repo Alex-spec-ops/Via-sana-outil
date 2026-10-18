@@ -13,7 +13,7 @@ import { seed } from "./seed";
 //   on each cold start.
 
 // Bump when the schema or the demo data format changes: an older demo database is rebuilt from scratch.
-const SCHEMA_VERSION = "5";
+const SCHEMA_VERSION = "6";
 
 type Value = string | number | null | undefined;
 /** Positional values ("?" placeholders), or one object of named values (":name" placeholders). */

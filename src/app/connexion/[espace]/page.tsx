@@ -15,21 +15,21 @@ const COPY: Record<SpaceSlug, { who: string; title: string; accent: string; intr
     title: "Bon retour",
     accent: "parmi nous",
     intro: "Retrouvez votre parcours, votre questionnaire, vos rendez-vous et les conseils de votre équipe.",
-    production: "En production, un code à usage unique s'ajoutera au mot de passe (recommandation CNIL pour les données de santé).",
+    production: "Double authentification (recommandation CNIL pour les données de santé) : après le mot de passe, un code à usage unique est envoyé par email.",
   },
   praticien: {
     who: "Professionnels de santé",
     title: "Espace",
     accent: "praticiens partenaires",
     intro: "Vous ne voyez que les coureurs qui vous ont accepté dans leur équipe de soins, et seulement les rubriques utiles à votre profession.",
-    production: "En production, connexion par Pro Santé Connect (carte e-CPS) à la place du mot de passe.",
+    production: "Double authentification par code à usage unique. En production, Pro Santé Connect (carte e-CPS) remplacera mot de passe et code.",
   },
   coordination: {
     who: "Équipe Via Sana",
     title: "Espace",
     accent: "coordination Via Sana",
     intro: "L'organisation des parcours : questionnaires, rendez-vous, équipes et relances. Le contenu clinique reste entre le coureur et ses praticiens.",
-    production: "En production, accès réservé à l'équipe Via Sana avec double facteur.",
+    production: "Double authentification : mot de passe, puis code à usage unique. Accès réservé à l'équipe Via Sana.",
   },
 };
 

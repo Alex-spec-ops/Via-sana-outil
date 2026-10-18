@@ -8,7 +8,8 @@ import { get, resetDemoData, run, transaction } from "@/lib/db";
 import { BILAN_DIMENSIONS, COORDINATION_OFFER, INTAKE_SECTIONS, needsMedicalOpinion, type IntakeAnswers } from "@/lib/domain";
 import { addCatalogStep, advance, completeStep, instantiatePhase, skipStep } from "@/lib/pathway";
 import { isInCareTeam, logAccess } from "@/lib/queries";
-import { SPACES, isSpace } from "@/lib/spaces";
+import { SPACES, isSpace, type SpaceSlug } from "@/lib/spaces";
+import { MAX_CODE_ATTEMPTS, closeChallenge, codeMatches, currentChallenge, recordWrongCode, resendCode, startChallenge } from "@/lib/mfa";
 import { PASSWORD_MAX_LENGTH, dummyPasswordHash, hashPassword, passwordProblem, verifyPassword } from "@/lib/passwords";
 
 function text(formData: FormData, key: string, max = 2000) {
@@ -87,21 +88,75 @@ export async function loginWithPassword(_prev: LoginState, formData: FormData): 
   const valid = await verifyPassword(password, credential.password_hash);
   if (locked) return { error: LOGIN_ERROR };
   if (!valid) {
-    const failures = credential.failed_count + 1;
-    const lockUntil = failures >= MAX_FAILURES ? new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString() : null;
-    await run(
-      "UPDATE credentials SET failed_count = ?, locked_until = ? WHERE email = ?",
-      lockUntil ? 0 : failures, lockUntil ?? credential.locked_until, email,
-    );
-    await authLog(credential.user_type, credential.user_id, lockUntil ? "verrouillage" : "echec");
+    await registerFailure(credential);
     return { error: LOGIN_ERROR };
   }
 
-  await run("UPDATE credentials SET failed_count = 0, locked_until = NULL WHERE email = ?", email);
-  await authLog(credential.user_type, credential.user_id, "connexion");
-  await startSession({ type: credential.user_type, id: credential.user_id });
-  if (credential.user_type === "patient") await logAccess("patient", credential.user_id, credential.user_id, "connexion");
-  redirect(await homeFor(credential.user_type, credential.user_id));
+  // Right password: second factor. No session until the code is entered.
+  await startChallenge(credential, space as SpaceSlug);
+  await authLog(credential.user_type, credential.user_id, "code_envoye");
+  redirect("/connexion/verification");
+}
+
+/** One more failure on the account; the 5th in a row suspends it for 15 minutes. */
+async function registerFailure(credential: CredentialRow) {
+  const failures = credential.failed_count + 1;
+  const lockUntil = failures >= MAX_FAILURES ? new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString() : null;
+  await run(
+    "UPDATE credentials SET failed_count = ?, locked_until = ? WHERE email = ?",
+    lockUntil ? 0 : failures, lockUntil ?? credential.locked_until, credential.email,
+  );
+  await authLog(credential.user_type, credential.user_id, lockUntil ? "verrouillage" : "echec");
+}
+
+export type VerifyState = { error: string | null; info: string | null; expired?: boolean };
+
+/**
+ * Second step of the login: checks the single-use code, or sends a new one.
+ * Five wrong codes end the step and count as a failure on the account.
+ */
+export async function verifyLoginCode(_prev: VerifyState, formData: FormData): Promise<VerifyState> {
+  const challenge = await currentChallenge();
+  if (!challenge) return { error: "Ce code a expiré. Reconnectez-vous pour en recevoir un nouveau.", info: null, expired: true };
+
+  if (text(formData, "intent", 10) === "resend") {
+    const sent = await resendCode(challenge);
+    if (sent) {
+      await authLog(challenge.user_type, challenge.user_id, "code_envoye");
+      refresh(); // the demo mailbox shows the new message
+    }
+    return sent
+      ? { error: null, info: "Un nouveau code vient d'être envoyé. L'ancien ne fonctionne plus." }
+      : { error: "Vous avez déjà demandé 3 nouveaux codes. Reconnectez-vous.", info: null };
+  }
+
+  const code = text(formData, "code", 20).replace(/\D/g, "");
+  if (code.length !== 6 || !codeMatches(challenge, code)) {
+    const attempts = await recordWrongCode(challenge);
+    await authLog(challenge.user_type, challenge.user_id, "code_refuse");
+    if (attempts >= MAX_CODE_ATTEMPTS) {
+      await closeChallenge(challenge.id);
+      const credential = await get<CredentialRow>("SELECT * FROM credentials WHERE user_id = ? AND user_type = ?", challenge.user_id, challenge.user_type);
+      if (credential) await registerFailure(credential);
+      return { error: "Trop de codes incorrects. Reconnectez-vous.", info: null, expired: true };
+    }
+    const left = MAX_CODE_ATTEMPTS - attempts;
+    return { error: `Code incorrect. Il vous reste ${left} essai${left > 1 ? "s" : ""}.`, info: null };
+  }
+
+  await closeChallenge(challenge.id);
+  await run("UPDATE credentials SET failed_count = 0, locked_until = NULL WHERE user_id = ? AND user_type = ?", challenge.user_id, challenge.user_type);
+  await authLog(challenge.user_type, challenge.user_id, "connexion");
+  await startSession({ type: challenge.user_type, id: challenge.user_id });
+  if (challenge.user_type === "patient") await logAccess("patient", challenge.user_id, challenge.user_id, "connexion");
+  redirect(await homeFor(challenge.user_type, challenge.user_id));
+}
+
+/** Leaves the second step and goes back to the space's login page. */
+export async function cancelLoginCode() {
+  const challenge = await currentChallenge();
+  if (challenge) await closeChallenge(challenge.id);
+  redirect(challenge ? SPACES[challenge.space].login : "/connexion");
 }
 
 export type SignupState = { error: string | null; values: Record<string, string> };

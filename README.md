@@ -37,6 +37,8 @@ Ouvrir http://localhost:3000 : la page d'accueil propose deux entrées.
 
   Chaque page n'accepte que les comptes de son espace : un compte d'un autre espace reçoit le même message d'erreur qu'un mot de passe faux, sans révéler qu'il existe. Chaque page liste ses comptes fictifs (un clic remplit le formulaire), avec le mot de passe de démonstration commun `Demo-ViaSana-2026`.
 
+  **Double authentification** : après le mot de passe, un code à 6 chiffres est envoyé à l'adresse du compte (page `/connexion/verification`). Il est valable 10 minutes, utilisable une fois, refusé après 5 erreurs, et il peut être renvoyé 3 fois. La session ne s'ouvre qu'après le code. Les adresses étant fictives, une « boîte mail de démonstration » affiche le message envoyé (table `demo_outbox`, vidée dès le code utilisé) ; en production, un service d'email ou de SMS le remplacerait.
+
 Les données fictives sont créées automatiquement au premier lancement. Le bouton « Réinitialiser les données de démo » (page `/connexion`) remet tout à zéro.
 
 ## Trois rôles
@@ -88,7 +90,7 @@ L'analyse complète, avec les liens Légifrance, est dans [`docs/brief-et-cadre-
 | Strictement nécessaire | CSP L1110-4 II-III | Chaque section du questionnaire déclare ses destinataires parmi les 8 professions et la coordination (`src/lib/domain.ts`). |
 | Opposition au partage | CSP L1110-4 IV | Chaque praticien ne voit plus que ses propres notes et comptes rendus. |
 | Partage hors équipe | CSP L1110-4 III | Case de consentement obligatoire, lien à jeton révocable, chaque ouverture inscrite au journal du patient. |
-| Mots de passe | CNIL délibération 2022-100 | Hachage scrypt avec un sel aléatoire de 128 bits par compte (jamais en clair) ; au moins 14 caractères (ou 12 avec un caractère spécial) mêlant majuscules, minuscules et chiffres ; message d'erreur unique ; compte suspendu 15 min après 5 échecs ; journal `auth_logs` sans mot de passe ni identifiant inconnu. |
+| Mots de passe | CNIL délibération 2022-100 | Hachage scrypt avec un sel aléatoire de 128 bits par compte (jamais en clair) ; au moins 14 caractères (ou 12 avec un caractère spécial) mêlant majuscules, minuscules et chiffres ; message d'erreur unique ; compte suspendu 15 min après 5 échecs ; journal `auth_logs` sans mot de passe ni identifiant inconnu. **Double authentification** : code à usage unique de 6 chiffres (10 min, 5 essais), dont seul un HMAC est stocké. |
 | Cloisonnement et journalisation exploitée | CNIL SAN-2026-009 | Table `access_logs` (accès autorisés et refusés, praticiens, coordination, destinataires externes), visible par le patient. |
 | Pas de mise en cache de données de santé | RGPD art. 32 | Rendu 100 % dynamique, `Cache-Control: no-store`, `noindex`, `X-Frame-Options: DENY`. |
 
@@ -157,7 +159,7 @@ Avant de commencer : « Réinitialiser les données de démo » sur `/connexion`
 
 ## Limites et suites
 
-- **Authentification :** email et mot de passe (CNIL 2022-100). En production, ajouter un second facteur, recommandé par la CNIL pour les données de santé : Pro Santé Connect / e-CPS pour les praticiens, code à usage unique pour la coordination et les patients. Supprimer aussi le mot de passe de démonstration commun et ajouter la réinitialisation par email.
+- **Authentification :** email, mot de passe (CNIL 2022-100) et code à usage unique (double authentification). En production : envoyer le code par un vrai service d'email ou de SMS, passer les praticiens sur Pro Santé Connect / e-CPS, supprimer le mot de passe de démonstration commun et ajouter la réinitialisation par email. L'inscription ouvre encore la session sans code : la vérification de l'adresse email serait à ajouter.
 - **Paiement non intégré :** l'offre à 150 € est seulement affichée ; pas de vrai rendez-vous en ligne non plus.
 - **Base de démo éphémère :** elle est recréée sur Vercel. En production : PostgreSQL chez un hébergeur HDS.
 - **Pistes :**

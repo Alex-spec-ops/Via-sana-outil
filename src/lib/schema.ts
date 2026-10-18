@@ -217,8 +217,34 @@ CREATE TABLE IF NOT EXISTS auth_logs (
   id BIGSERIAL PRIMARY KEY,
   user_type TEXT NOT NULL,
   user_id TEXT NOT NULL,
-  event TEXT NOT NULL CHECK (event IN ('connexion','echec','verrouillage','changement_mot_de_passe')),
+  event TEXT NOT NULL CHECK (event IN ('connexion','echec','verrouillage','changement_mot_de_passe','code_envoye','code_refuse')),
   at TEXT NOT NULL
+);
+
+-- Second factor: after the password, a 6-digit single-use code (10 minutes,
+-- 5 attempts). Only an HMAC of the code is stored.
+CREATE TABLE IF NOT EXISTS login_challenges (
+  id TEXT PRIMARY KEY,
+  user_type TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  email TEXT NOT NULL,
+  space TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  resends INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
+-- Demo stand-in for the email provider: the messages "sent" (all addresses
+-- are fictional). Deleted as soon as the code is used.
+CREATE TABLE IF NOT EXISTS demo_outbox (
+  id BIGSERIAL PRIMARY KEY,
+  challenge_id TEXT NOT NULL,
+  recipient TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_care_team_practitioner ON care_team(practitioner_id);
@@ -236,7 +262,7 @@ DECLARE t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY['coordinators','practitioners','patients','pathways','pathway_steps','step_catalog',
     'enrollments','care_team','enrollment_steps','sessions','reports','external_shares','notes','checkins',
-    'intake_forms','relances','access_logs','credentials','auth_logs','app_meta']
+    'intake_forms','relances','access_logs','credentials','auth_logs','login_challenges','demo_outbox','app_meta']
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;
@@ -249,7 +275,7 @@ END $$;
 
 /** Every table, children first — used to wipe the demo data. */
 export const TABLES_CHILD_FIRST = [
-  "auth_logs", "credentials", "access_logs", "relances", "intake_forms", "checkins", "notes", "external_shares", "reports", "sessions",
+  "demo_outbox", "login_challenges", "auth_logs", "credentials", "access_logs", "relances", "intake_forms", "checkins", "notes", "external_shares", "reports", "sessions",
   "enrollment_steps", "care_team", "enrollments", "step_catalog", "pathway_steps", "pathways", "patients",
   "practitioners", "coordinators",
 ];
